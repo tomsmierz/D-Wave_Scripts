@@ -7,18 +7,32 @@ from dwave.cloud import Client
 from tqdm import tqdm
 import dwave.inspector
 import matplotlib.pyplot as plt
+import os
 
-df = pd.read_csv("instances\\P4\\001.txt", sep=" ")
+path = os.getcwd()
+
+
+def get_pegasus(size, number: str = "001"):
+    df = pd.read_csv(os.path.join(path, f"instances/{size}/{number}.txt"),
+                     sep=" ", index_col=False, skiprows=1, header=None)
+    h = {}
+    J = {}
+    for index, row in df.iterrows():
+        if row[0] == row[1]:
+            h[int(row[0] - 1)] = row[2]
+        else:
+            J[(int(row[0] - 1), int(row[1] - 1))] = row[2]
+    return h, J
 
 
 client = Client.from_config()
 num_reads = 5000
 
-mim_time = 0.5
+min_time = 0.5
 default_time = 20
 max_time = 200
 
-sampler = DWaveSampler(solver="Advantage_system6.1", auto_scale=True)
+sampler = DWaveSampler(solver="Advantage_system6.1", auto_scale=True, annealing_time=min_time)
 
 graph = dnx.pegasus_graph(16, data=False, fabric_only=False)
 
@@ -28,5 +42,26 @@ real_edges = sampler.edgelist
 broken_nodes = list(set(graph.nodes) - set(real_nodes))
 broken_edges = list(set(graph.edges) - set(real_edges))
 
-solver = AutoEmbeddingComposite(sampler)
-#solver.sample_ising(num_reads=1, label="Pegasus", )
+#solver = AutoEmbeddingComposite(sampler)
+# solver.sample_ising(num_reads=1, label="Pegasus", )
+
+
+with open(os.path.join(path, "energies_P16_min_time.txt"), "w") as f:
+    for i in tqdm(range(100)):
+        name = f"00{i+1}"[-3:]
+        h, J = get_pegasus("P16", name)
+        for v in broken_nodes:
+            del h[v]
+        for e in broken_edges:
+            del J[e]
+
+        sampleset = sampler.sample_ising(h, J, num_reads=num_reads, label='test',
+                                         auto_scale=True, annealing_time=min_time)
+
+        best = sampleset.first
+
+        f.write(name + ".txt" + " " + ":" + " " + f"{best[1]:.6f}" + " ")
+        for value in best[0].values():
+            f.write(str(int((value+1)/2)) + " ")
+        f.write("\n")
+
