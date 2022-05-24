@@ -4,8 +4,18 @@ import argparse
 import numpy as np
 import os
 
+from typing import Dict
+
 rng = np.random.default_rng()
 path = os.getcwd()
+
+
+def normalize(d: Dict) -> Dict:
+    max_value = max(d.values())
+    normalized = {}
+    for key in d.keys():
+        normalized[key] = d[key]/max_value
+    return normalized
 
 
 def generate_pegasus_instances(number: int, size: int, out: str, distribution: str):
@@ -15,6 +25,7 @@ def generate_pegasus_instances(number: int, size: int, out: str, distribution: s
 
         if distribution == "normal":
             couplings = {edge: rng.normal(0, 1) for edge in pegasus.edges}
+            #couplings = normalize(couplings)
             bias = {node: rng.normal(0, 1) for node in pegasus.nodes}
 
         nx.set_node_attributes(pegasus, bias, "h")
