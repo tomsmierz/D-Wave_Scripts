@@ -27,6 +27,9 @@ def generate_pegasus_instances(number: int, size: int, out: str, distribution: s
             couplings = {edge: rng.normal(0, 1) for edge in pegasus.edges}
             #couplings = normalize(couplings)
             bias = {node: rng.normal(0, 1) for node in pegasus.nodes}
+        if distribution == "uniform":
+            couplings = {edge: rng.uniform(-1, 1) for edge in pegasus.edges}
+            bias = {node: rng.uniform(-4, 4) for node in pegasus.nodes}
 
         nx.set_node_attributes(pegasus, bias, "h")
         nx.set_edge_attributes(pegasus, couplings, "J")
