@@ -5,10 +5,13 @@ import numpy as np
 import os
 
 from typing import Dict
+from dwave.system import DWaveSampler
+from dwave.cloud import Client
 
 rng = np.random.default_rng()
 path = os.getcwd()
 
+sampler = DWaveSampler(solver="Advantage_system6.1")
 
 def normalize(d: Dict) -> Dict:
     max_value = max(d.values())
@@ -18,7 +21,7 @@ def normalize(d: Dict) -> Dict:
     return normalized
 
 
-def generate_pegasus_instances(number: int, size: int, out: str, distribution: str):
+def generate_pegasus_instances(number: int, size: int, out: str, distribution: str, ):
     pegasus = dnx.pegasus_graph(size, data=False, fabric_only=False)
 
     for i in range(number):

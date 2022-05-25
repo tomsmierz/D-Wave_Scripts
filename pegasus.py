@@ -43,9 +43,13 @@ real_edges = sampler.edgelist
 broken_nodes = list(set(graph.nodes) - set(real_nodes))
 broken_edges = list(set(graph.edges) - set(real_edges))
 
+print(len(broken_nodes), len(broken_edges))
+
 #solver = AutoEmbeddingComposite(sampler)
 # solver.sample_ising(num_reads=1, label="Pegasus", )
 
+
+"""
 for time in [long_time]:
     with open(os.path.join(path, f"energies_P16_{time}.txt"), "w") as f:
         for i in tqdm(range(100)):
@@ -66,3 +70,4 @@ for time in [long_time]:
                 f.write(str(int((value+1)/2)) + " ")
             f.write("\n")
 
+"""
