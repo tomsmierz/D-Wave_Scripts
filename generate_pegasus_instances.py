@@ -7,6 +7,7 @@ import os
 from typing import Dict
 from dwave.system import DWaveSampler
 from dwave.cloud import Client
+from tqdm import tqdm
 
 rng = np.random.default_rng()
 path = os.getcwd()
@@ -22,9 +23,10 @@ def normalize(d: Dict) -> Dict:
 
 
 def generate_pegasus_instances(number: int, size: int, out: str, distribution: str, ):
-    pegasus = dnx.pegasus_graph(size, data=False, fabric_only=False)
+    pegasus = dnx.pegasus_graph(size, data=False, fabric_only=True)
+    #pegasus = sampler.to_networkx_graph()
 
-    for i in range(number):
+    for i in tqdm(range(number), desc="generating pegasus instances: "):
 
         if distribution == "normal":
             couplings = {edge: rng.normal(0, 1) for edge in pegasus.edges}
