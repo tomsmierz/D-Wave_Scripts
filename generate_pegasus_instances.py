@@ -28,12 +28,13 @@ def generate_pegasus_instances(number: int, size: int, out: str, distribution: s
 
     sampler = DWaveSampler(solver="Advantage_system6.1")
 
+    for i in range(6):
+        pegasus.remove_node(26 + i)
+        pegasus.remove_node(16 + i)
 
-    real_nodes = sampler.nodelist
-    real_edges = sampler.edgelist
-
-    broken_nodes = list(set(pegasus.nodes) - set(real_nodes))
-    broken_edges = list(set(pegasus.edges) - set(real_edges))
+    for i in range(2):
+        pegasus.remove_node(44 + i)
+        pegasus.remove_node(2 + i)
 
     for i in tqdm(range(number), desc="generating pegasus instances: "):
 
