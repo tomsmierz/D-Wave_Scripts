@@ -22,9 +22,18 @@ def normalize(d: Dict) -> Dict:
     return normalized
 
 
-def generate_pegasus_instances(number: int, size: int, out: str, distribution: str, ):
+def generate_pegasus_instances(number: int, size: int, out: str, distribution: str):
     pegasus = dnx.pegasus_graph(size, data=False, fabric_only=True)
     #pegasus = sampler.to_networkx_graph()
+
+    sampler = DWaveSampler(solver="Advantage_system6.1")
+
+
+    real_nodes = sampler.nodelist
+    real_edges = sampler.edgelist
+
+    broken_nodes = list(set(pegasus.nodes) - set(real_nodes))
+    broken_edges = list(set(pegasus.edges) - set(real_edges))
 
     for i in tqdm(range(number), desc="generating pegasus instances: "):
 
@@ -69,3 +78,58 @@ if __name__ == "__main__":
         parser.error("Maximum number of generated instances is 999.")
 
     generate_pegasus_instances(args.number, args.size, args.path, args.distribution)
+
+#P2
+"""
+for i in range(6):
+    graph.remove_node(26 + i)
+    graph.remove_node(16 + i)
+
+for i in range(2):
+    graph.remove_node(44 + i)
+    graph.remove_node(2 + i)
+"""
+
+#P4
+"""
+for i in range(18):
+    pegasus.remove_node(150 + i)
+    pegasus.remove_node(120 + i)
+
+for i in range(6):
+    pegasus.remove_node(6 + i)
+    pegasus.remove_node(276 + i)
+
+"""
+
+#P8
+
+"""
+for i in range(42):
+    pegasus.remove_node(686 + i)
+    pegasus.remove_node(616 + i)
+
+for i in range(14):
+    pegasus.remove_node(14 + i)
+    pegasus.remove_node(1316 + i)
+
+"""
+
+
+#P16
+
+"""
+    for i in range(90):
+        pegasus.remove_node(2910 + i)
+        pegasus.remove_node(2760 + i)
+
+    for i in range(30):
+        pegasus.remove_node(30 + i)
+        pegasus.remove_node(5700 + i)
+
+    for i in broken_nodes:
+        pegasus.remove_node(i)
+
+    for e in [(161, 5100), (2032, 4270), (641, 5118), (4832, 4833)]:
+        pegasus.remove_edge(e[0], e[1])
+"""

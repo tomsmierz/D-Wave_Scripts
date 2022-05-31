@@ -1,5 +1,6 @@
 from dwave.system import AutoEmbeddingComposite, DWaveSampler
 import dwave_networkx as dnx
+import greedy
 import networkx as nx
 from numpy.random import default_rng
 import pandas as pd
@@ -13,7 +14,7 @@ path = os.getcwd()
 
 
 def get_pegasus(size, number: str = "001"):
-    df = pd.read_csv(os.path.join(path, f"instances/{size}/{number}.txt"),
+    df = pd.read_csv(f"C:/Users/walle/PycharmProjects/D-Wave_Scripts/instances/cross_only/P16/{number}.txt",
                      sep=" ", index_col=False, skiprows=1, header=None)
     h = {}
     J = {}
@@ -43,25 +44,30 @@ real_edges = sampler.edgelist
 broken_nodes = list(set(graph.nodes) - set(real_nodes))
 broken_edges = list(set(graph.edges) - set(real_edges))
 
-print(len(broken_nodes), len(broken_edges))
+#solver = greedy.SteepestDescentSolver()
 
 #solver = AutoEmbeddingComposite(sampler)
-# solver.sample_ising(num_reads=1, label="Pegasus", )
+
+#h, J = get_pegasus("", number="001")
 
 
-"""
-for time in [long_time]:
-    with open(os.path.join(path, f"energies_P16_{time}.txt"), "w") as f:
+
+#print(all(edge in sampler.edgelist for edge in J.keys()))
+#print(all(node in sampler.nodelist for node in h.keys()))
+#print(list(set(J.keys()) - set(real_edges)))
+#sampleset = sampler.sample_ising(h, J, num_reads=1, label="Pegasus")
+
+#dwave.inspector.show(sampleset)
+
+
+
+for time in [min_time]:
+    with open(os.path.join(path, f"energies_P16_crosses_{time}.txt"), "w") as f:
         for i in tqdm(range(100)):
             name = f"00{i+1}"[-3:]
             h, J = get_pegasus("P16", name)
-            for v in broken_nodes:
-                del h[v]
-            for e in broken_edges:
-                del J[e]
 
-            sampleset = sampler.sample_ising(h, J, num_reads=num_reads, label='test',
-                                             auto_scale=True, annealing_time=time)
+            sampleset = sampler.sample_ising(h, J, num_reads=num_reads, label=f'P16_{time}', annealing_time=time)
 
             best = sampleset.first
 
@@ -70,4 +76,21 @@ for time in [long_time]:
                 f.write(str(int((value+1)/2)) + " ")
             f.write("\n")
 
+
+
+"""
+asadssf
+with open(os.path.join(path, f"energies_P16_greedy.txt"), "w") as f:
+    for i in tqdm(range(100)):
+        name = f"00{i + 1}"[-3:]
+        h, J = get_pegasus("P16", name)
+
+        sampleset = solver.sample_ising(h, J)
+
+        best = sampleset.first
+
+        f.write(name + ".txt" + " " + ":" + " " + f"{best[1]:.6f}" + " ")
+        for value in best[0].values():
+            f.write(str(int((value + 1) / 2)) + " ")
+        f.write("\n")
 """
