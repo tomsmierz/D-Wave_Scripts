@@ -92,9 +92,9 @@ print(all(edge in sampler.edgelist for edge in J.keys()))
 
 
 
-for time in [min_time, default_time, long_time]:
-    with open(os.path.join(path, f"energies_P8_crosses_{time}.txt"), "w") as f:
-        for i in tqdm(range(100)):
+for time in [long_time]:
+    with open(os.path.join(path, f"energies_P8_crosses_{time}_3.txt"), "w") as f:
+        for i in tqdm(range(93,100)):
             name = f"00{i+1}"[-3:]
             h, J = get_pegasus(8, name)
             del J[(2032, 4270)]
