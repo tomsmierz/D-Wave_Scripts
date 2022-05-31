@@ -14,7 +14,7 @@ path = os.getcwd()
 
 
 def get_pegasus(size, number: str = "001"):
-    df = pd.read_csv(f"C:/Users/walle/PycharmProjects/D-Wave_Scripts/instances/cross_only/P16/{number}.txt",
+    df = pd.read_csv(f"/home/tsmierzchalski/PycharmProjects/D-Wave_Scripts/instances/cross_only/P16/{number}.txt",
                      sep=" ", index_col=False, skiprows=1, header=None)
     h = {}
     J = {}
@@ -61,7 +61,7 @@ broken_edges = list(set(graph.edges) - set(real_edges))
 
 
 
-for time in [min_time]:
+for time in [long_time]:
     with open(os.path.join(path, f"energies_P16_crosses_{time}.txt"), "w") as f:
         for i in tqdm(range(100)):
             name = f"00{i+1}"[-3:]
