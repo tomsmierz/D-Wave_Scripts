@@ -49,9 +49,13 @@ broken_edges = list(set(graph.edges) - set(real_edges))
 #solver = greedy.SteepestDescentSolver()
 
 #solver = AutoEmbeddingComposite(sampler)
-
-
-
+"""
+h, J = get_pegasus(8)
+del J[(2032, 4270)]
+sampleset = sampler.sample_ising(h, J, num_reads=1, label="test")
+dwave.inspector.show(sampleset)
+"""
+"""
 source = dnx.pegasus_graph(8, nice_coordinates=True)
 #target = dnx.pegasus_graph(16, nice_coordinates=True)
 target = sampler.to_networkx_graph()
@@ -71,7 +75,7 @@ for i in tqdm(range(len(mappings))):
     if all(node in sampler.nodelist for node in h.keys()): #and all(edge in sampler.edgelist for edge in J.keys()):
         print(i, list(set(J.keys()) - set(real_edges)))
 
-
+"""
 
 """
 l = {node: mappings[29](node) for node in source.nodes()}
@@ -87,13 +91,13 @@ print(all(edge in sampler.edgelist for edge in J.keys()))
 """
 
 
-"""
-for time in [long_time]:
-    with open(os.path.join(path, f"energies_P4_crosses_{time}.txt"), "w") as f:
+
+for time in [min_time, default_time, long_time]:
+    with open(os.path.join(path, f"energies_P8_crosses_{time}.txt"), "w") as f:
         for i in tqdm(range(100)):
             name = f"00{i+1}"[-3:]
-            h, J = get_pegasus(4, name)
-
+            h, J = get_pegasus(8, name)
+            del J[(2032, 4270)]
             sampleset = sampler.sample_ising(h, J, num_reads=num_reads, label=f'P4_{time}', annealing_time=time)
 
             best = sampleset.first
@@ -104,7 +108,7 @@ for time in [long_time]:
             f.write("\n")
 
 
-"""
+
 """
 asadssf
 with open(os.path.join(path, f"energies_P16_greedy.txt"), "w") as f:
