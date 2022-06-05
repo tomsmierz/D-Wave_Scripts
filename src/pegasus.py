@@ -51,6 +51,7 @@ def anneal(input_path: str, output_name: str, output_path: str = cwd,
                 name = f"0{i}"[-2:]
 
             h, J = get_pegasus(input_path, name)
+            del(J[(2032, 4270)])
 
             sampleset = sampler.sample_ising(h, J, num_reads=num_reads, auto_scale=False,
                                              label=f'{output_name}_{annealing_time}', annealing_time=annealing_time)
@@ -139,7 +140,7 @@ with open(os.path.join(path, f"energies_P16_greedy.txt"), "w") as f:
 if __name__ == "__main__":
 
     annealing_times = [min_time, default_time, long_time]  # [min_time, default_time, long_time]
-    path = "/home/tsmierzchalski/pycharm_projects/D-Wave_Scripts/instances/normal/P2"
+    path = "/home/tsmierzchalski/pycharm_projects/D-Wave_Scripts/instances/normal/P8"
     name = "P2_normal"
     for time in annealing_times:
         anneal(path, f"energies_{name}", annealing_time=time)

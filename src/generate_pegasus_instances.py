@@ -50,7 +50,8 @@ def find_map(size: int):
     target = sampler.to_networkx_graph()
     mappings = [mapping for mapping in dnx.pegasus_sublattice_mappings(source, target)]
     mapping = None
-    for i in tqdm(range(len(mappings)), desc="Searching for mapping"):
+    edges = None
+    for i in tqdm(range(len(mappings)), desc="Searching for perfect mapping"):
 
         l = {node: mappings[i](node) for node in source.nodes()}
         nx.set_node_attributes(source, l, "mapping")
@@ -66,8 +67,24 @@ def find_map(size: int):
             break
 
     if mapping is None:
-        raise ValueError("Couldn't find mapping")
-    return mapping
+        proposed = {}
+        for i in tqdm(range(len(mappings)), desc="Searching for imperfect mapping"):
+
+            l = {node: mappings[i](node) for node in source.nodes()}
+            nx.set_node_attributes(source, l, "mapping")
+
+            em = nx.get_node_attributes(source, "mapping")
+
+            h = {node: rng.uniform(-4, 4) for node in em.values()}
+            # print(all(node in sampler.nodelist for node in h.keys()))
+            J = {(em[edge[0]], em[edge[1]]): rng.uniform(-1, 1) for edge in source.edges()}
+            # print(all(edge in sampler.edgelist for edge in J.keys()))
+            if all(node in sampler.nodelist for node in h.keys()):
+                proposed[i] = list(set(J.keys()) - set(sampler.edgelist))
+
+        mapping = list(proposed.keys())[0]
+        edges = proposed[mapping]
+    return mapping, edges
 
 
 
@@ -109,7 +126,7 @@ def generate_pegasus_instances(number: int, size: int, out: str, distribution: s
 
 
 
-def generate_pegasus_map(number: int, size: int, out: str, mapping: int):
+def generate_pegasus_map(number: int, size: int, out: str, mapping: int, wrong_edges = None):
 
     source = dnx.pegasus_graph(size, nice_coordinates=True)
     # target = dnx.pegasus_graph(16, nice_coordinates=True)
@@ -139,7 +156,10 @@ def generate_pegasus_map(number: int, size: int, out: str, mapping: int):
                 f.write(str(node + 1) + " " + str(node + 1) + " " + str(value) + "\n")
             for edge, value in J.items():
                 f.write(str(edge[0] + 1) + " " + str(edge[1] + 1) + " " + str(value) + "\n")
-            #f.write(str(2033) + " " + str(4271) + " " + str(0) + "\n")
+            if wrong_edges is not None:
+                for edge in wrong_edges:
+                    f.write(str(edge[0]) + " " + str(edge[1]) + " " + str(0) + "\n")
+
 
 
 if __name__ == "__main__":
@@ -161,8 +181,8 @@ if __name__ == "__main__":
 
     #generate_pegasus_instances(args.number, args.size, args.path, args.distribution)
 
-    mapping = find_map(args.size)
-    generate_pegasus_map(args.number, args.size, args.path, mapping)
+    mapping, edges = find_map(args.size)
+    generate_pegasus_map(args.number, args.size, args.path, mapping, edges)
 #P2
 """
 for i in range(6):
