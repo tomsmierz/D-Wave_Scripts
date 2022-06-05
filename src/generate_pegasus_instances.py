@@ -14,12 +14,61 @@ path = os.getcwd()
 
 sampler = DWaveSampler(solver="Advantage_system6.1")
 
+
 def normalize(d: Dict) -> Dict:
     max_value = max(d.values())
     normalized = {}
     for key in d.keys():
         normalized[key] = d[key]/max_value
     return normalized
+
+def h_range():
+    low = -4.0
+    high = 4.0
+    value = rng.normal(0, 1)
+    r = value
+    if value > high:
+        r = high
+    elif value < low:
+        r = low
+    return r
+
+def J_range():
+    low = -1.0
+    high = 1.0
+    value = rng.normal(0, 0.5)
+    r = value
+    if value > high:
+        r = high
+    elif value < low:
+        r = low
+    return r
+
+def find_map(size: int):
+    source = dnx.pegasus_graph(size, nice_coordinates=True)
+    # target = dnx.pegasus_graph(16, nice_coordinates=True)
+    target = sampler.to_networkx_graph()
+    mappings = [mapping for mapping in dnx.pegasus_sublattice_mappings(source, target)]
+    mapping = None
+    for i in tqdm(range(len(mappings)), desc="Searching for mapping"):
+
+        l = {node: mappings[i](node) for node in source.nodes()}
+        nx.set_node_attributes(source, l, "mapping")
+
+        em = nx.get_node_attributes(source, "mapping")
+
+        h = {node: rng.uniform(-4, 4) for node in em.values()}
+        # print(all(node in sampler.nodelist for node in h.keys()))
+        J = {(em[edge[0]], em[edge[1]]): rng.uniform(-1, 1) for edge in source.edges()}
+        # print(all(edge in sampler.edgelist for edge in J.keys()))
+        if all(node in sampler.nodelist for node in h.keys()) and all(edge in sampler.edgelist for edge in J.keys()):
+            mapping = i
+            break
+
+    if mapping is None:
+        raise ValueError("Couldn't find mapping")
+    return mapping
+
 
 
 def generate_pegasus_instances(number: int, size: int, out: str, distribution: str):
@@ -60,7 +109,7 @@ def generate_pegasus_instances(number: int, size: int, out: str, distribution: s
 
 
 
-def generate_pegasus_map(number: int, size: int, out: str):
+def generate_pegasus_map(number: int, size: int, out: str, mapping: int):
 
     source = dnx.pegasus_graph(size, nice_coordinates=True)
     # target = dnx.pegasus_graph(16, nice_coordinates=True)
@@ -73,10 +122,12 @@ def generate_pegasus_map(number: int, size: int, out: str):
     em = nx.get_node_attributes(source, "mapping")
     for i in tqdm(range(number), desc="generating pegasus instances: "):
 
-        h = {node: rng.uniform(-4, 4) for node in em.values()}
-        # print(all(node in sampler.nodelist for node in h.keys()))
-        J = {(em[edge[0]], em[edge[1]]): rng.uniform(-1, 1) for edge in source.edges()}
-        # print(all(edge in sampler.edgelist for edge in J.keys()))
+        #h = {node: rng.uniform(-4, 4) for node in em.values()}
+        #J = {(em[edge[0]], em[edge[1]]): rng.uniform(-1, 1) for edge in source.edges()}
+
+        h = {node: h_range() for node in em.values()}
+        J = {(em[edge[0]], em[edge[1]]): J_range() for edge in source.edges()}
+
 
         name = f"00{i + 1}"[-3:]
         name = name + ".txt"
@@ -108,9 +159,10 @@ if __name__ == "__main__":
     if args.number and args.number >= 1000:
         parser.error("Maximum number of generated instances is 999.")
 
-    generate_pegasus_instances(args.number, args.size, args.path, args.distribution)
+    #generate_pegasus_instances(args.number, args.size, args.path, args.distribution)
 
-    #generate_pegasus_map(args.number, args.size, args.path)
+    mapping = find_map(args.size)
+    generate_pegasus_map(args.number, args.size, args.path, mapping)
 #P2
 """
 for i in range(6):

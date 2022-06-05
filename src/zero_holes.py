@@ -33,7 +33,7 @@ print(len(broken_nodes))
 
 
 c=0
-with open(os.path.join(path, "../instances/cross_only/P16/002.txt"), "a") as f:
+with open(os.path.join(path, "../instances/uniform/P16/002.txt"), "a") as f:
     for node in broken_nodes:
         f.write(str(node + 1) + " " + str(node + 1) + " " + str(0) + "\n")
         c+=1

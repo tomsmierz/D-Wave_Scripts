@@ -137,13 +137,18 @@ with open(os.path.join(path, f"energies_P16_greedy.txt"), "w") as f:
 """
 
 if __name__ == "__main__":
+    h, J = get_pegasus("C:/Users/walle\\PycharmProjects\\D-Wave_Scripts\\instances\\normal\\P4", "001")
 
+    sampleset = sampler.sample_ising(h, J, num_reads=1, label="test")
+    dwave.inspector.show(sampleset)
+
+"""
     annealing_times = [min_time, default_time, long_time]  # [min_time, default_time, long_time]
     path = "/home/tsmierzchalski/pycharm_projects/D-Wave_Scripts/instances/pegasus/Pegasus_4x4x3/pegasus_4x4x3_spinglass_biased"
     name = "pegasus_4x4x3_spinglass_biased"
     for time in annealing_times:
         anneal(path, f"energies_{name}", annealing_time=time, random=False)
-
+"""
 """
     annealing_times = [min_time, default_time] #[min_time, default_time, long_time]
     for pg in ["pegasus_2x2x3"]: #, "pegasus_3x3x3", "Pegasus_4x4x3"]:
