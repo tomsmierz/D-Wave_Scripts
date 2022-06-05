@@ -116,7 +116,7 @@ def generate_pegasus_map(number: int, size: int, out: str, mapping: int):
     target = sampler.to_networkx_graph()
     mappings = [mapping for mapping in dnx.pegasus_sublattice_mappings(source, target)]
 
-    l = {node: mappings[0](node) for node in source.nodes()}
+    l = {node: mappings[mapping](node) for node in source.nodes()}
     nx.set_node_attributes(source, l, "mapping")
 
     em = nx.get_node_attributes(source, "mapping")
