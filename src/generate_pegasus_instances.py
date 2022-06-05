@@ -23,13 +23,16 @@ def normalize(d: Dict) -> Dict:
 
 
 def generate_pegasus_instances(number: int, size: int, out: str, distribution: str):
-    pegasus = dnx.pegasus_graph(size, data=False, fabric_only=True)
+    pegasus = dnx.pegasus_graph(size, fabric_only=True, nice_coordinates=True)
+
     #pegasus = sampler.to_networkx_graph()
 
     sampler = DWaveSampler(solver="Advantage_system6.1")
 
 
     for i in tqdm(range(number), desc="generating pegasus instances: "):
+
+        nodes = nx.get_node_attributes(pegasus, "linear_index")
 
         if distribution == "normal":
             couplings = {edge: rng.normal(0, 1) for edge in pegasus.edges}
@@ -43,16 +46,17 @@ def generate_pegasus_instances(number: int, size: int, out: str, distribution: s
         nx.set_node_attributes(pegasus, bias, "h")
         nx.set_edge_attributes(pegasus, couplings, "J")
 
-        name = f"00{i+1}"[-3:]
+        #name = f"00{i+1}"[-3:]
+        name = f"{101 + i}"
         name = name + ".txt"
 
         with open(os.path.join(out, name), "w") as f:
             f.write("# \n")
 
             for node in pegasus.nodes.data("h"):
-                f.write(str(node[0] + 1) + " " + str(node[0] + 1) + " " + str(node[1]) + "\n")
+                f.write(str(nodes[node[0]] + 1) + " " + str(nodes[node[0]] + -11) + " " + str(node[1]) + "\n")
             for edge in pegasus.edges.data("J"):
-                f.write(str(edge[0] + 1) + " " + str(edge[1] + 1) + " " + str(edge[2]) + "\n")
+                f.write(str(nodes[edge[0]] + 1) + " " + str(nodes[edge[1]] + -11) + " " + str(edge[2]) + "\n")
 
 
 
@@ -94,7 +98,7 @@ if __name__ == "__main__":
                         help="Size of the chimera graph. Default is 4 (P4).")
     parser.add_argument("-N", "--number", type=int, default=1,
                         help="Number of instances to be generated. Default is 1, maximum 999.")
-    parser.add_argument("-D", "--distribution", type=str, default="normal", choices=["normal", "uniform"],
+    parser.add_argument("-D", "--distribution", type=str, default="uniform", choices=["normal", "uniform"],
                         help="Distribution of biases and couplings")
     parser.add_argument("--path", type=str, default=path,
                         help="path to folder where generated instances will be located. Default is working directory")
@@ -104,9 +108,9 @@ if __name__ == "__main__":
     if args.number and args.number >= 1000:
         parser.error("Maximum number of generated instances is 999.")
 
-    #generate_pegasus_instances(args.number, args.size, args.path, args.distribution)
+    generate_pegasus_instances(args.number, args.size, args.path, args.distribution)
 
-    generate_pegasus_map(args.number, args.size, args.path)
+    #generate_pegasus_map(args.number, args.size, args.path)
 #P2
 """
 for i in range(6):

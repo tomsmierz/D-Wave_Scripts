@@ -7,7 +7,7 @@ import networkx as nx
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from dwave.system import AutoEmbeddingComposite, DWaveSampler
+from dwave.system import LazyEmbeddingComposite,AutoEmbeddingComposite, DWaveSampler
 from numpy.random import default_rng
 from dwave.cloud import Client
 from tqdm import tqdm
@@ -53,7 +53,7 @@ def anneal(input_path: str, output_name: str, output_path: str = cwd,
             h, J = get_pegasus(input_path, name)
 
             sampleset = solver.sample_ising(h, J, num_reads=num_reads,
-                                             label=f'{output_name}_{time}', annealing_time=annealing_time)
+                                             label=f'{output_name}_{annealing_time}', annealing_time=annealing_time)
 
             best = sampleset.first
 
@@ -137,9 +137,18 @@ with open(os.path.join(path, f"energies_P16_greedy.txt"), "w") as f:
 """
 
 if __name__ == "__main__":
-    annealing_times = [long_time] #[min_time, default_time, long_time]
+
+    annealing_times = [min_time, default_time, long_time]  # [min_time, default_time, long_time]
+    path = "/home/tsmierzchalski/pycharm_projects/D-Wave_Scripts/instances/pegasus/Pegasus_4x4x3/pegasus_4x4x3_spinglass_biased"
+    name = "pegasus_4x4x3_spinglass_biased"
+    for time in annealing_times:
+        anneal(path, f"energies_{name}", annealing_time=time, random=False)
+
+"""
+    annealing_times = [min_time, default_time] #[min_time, default_time, long_time]
     for pg in ["pegasus_2x2x3"]: #, "pegasus_3x3x3", "Pegasus_4x4x3"]:
         for x in os.scandir(f"C:/Users/walle/PycharmProjects/D-Wave_Scripts/instances/pegasus/{pg}"):
             for time in annealing_times:
                 anneal(x.path, f"energies_{x.name}", annealing_time=time, random=False)
 
+"""
