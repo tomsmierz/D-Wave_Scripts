@@ -137,7 +137,7 @@ with open(os.path.join(path, f"energies_P16_greedy.txt"), "w") as f:
 """
 
 if __name__ == "__main__":
-    h, J = get_pegasus("C:/Users/walle\\PycharmProjects\\D-Wave_Scripts\\instances\\normal\\P4", "001")
+    h, J = get_pegasus("/home/tsmierzchalski/pycharm_projects/D-Wave_Scripts/instances/normal/P4", "001")
 
     sampleset = sampler.sample_ising(h, J, num_reads=1, label="test")
     dwave.inspector.show(sampleset)
