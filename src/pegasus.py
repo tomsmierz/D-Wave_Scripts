@@ -141,7 +141,7 @@ if __name__ == "__main__":
 
     annealing_times = [min_time, default_time, long_time]  # [min_time, default_time, long_time]
     path = "/home/tsmierzchalski/pycharm_projects/D-Wave_Scripts/instances/normal/P8"
-    name = "P2_normal"
+    name = "P8_normal"
     for time in annealing_times:
         anneal(path, f"energies_{name}", annealing_time=time)
 

@@ -158,7 +158,7 @@ def generate_pegasus_map(number: int, size: int, out: str, mapping: int, wrong_e
                 f.write(str(edge[0] + 1) + " " + str(edge[1] + 1) + " " + str(value) + "\n")
             if wrong_edges is not None:
                 for edge in wrong_edges:
-                    f.write(str(edge[0]) + " " + str(edge[1]) + " " + str(0) + "\n")
+                    f.write(str(edge[0] + 1) + " " + str(edge[1] + 1) + " " + str(0) + "\n")
 
 
 
