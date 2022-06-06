@@ -51,7 +51,6 @@ def anneal(input_path: str, output_name: str, output_path: str = cwd,
                 name = f"0{i}"[-2:]
 
             h, J = get_pegasus(input_path, name)
-            del(J[(2032, 4270)])
 
             sampleset = sampler.sample_ising(h, J, num_reads=num_reads, auto_scale=False,
                                              label=f'{output_name}_{annealing_time}', annealing_time=annealing_time)
@@ -140,10 +139,52 @@ with open(os.path.join(path, f"energies_P16_greedy.txt"), "w") as f:
 if __name__ == "__main__":
 
     annealing_times = [min_time, default_time, long_time]  # [min_time, default_time, long_time]
-    path = "/home/tsmierzchalski/pycharm_projects/D-Wave_Scripts/instances/normal/P8"
-    name = "P8_normal"
+    path = "/home/tsmierzchalski/pycharm_projects/D-Wave_Scripts/instances/normal/P16"
+    name = "P16_normal"
     for time in annealing_times:
         anneal(path, f"energies_{name}", annealing_time=time)
+
+    chimera = DWaveSampler(solver="DW_2000Q_6")
+    chimera_graph = chimera.to_networkx_graph()
+    pegasus = DWaveSampler(solver="Advantage_system6.1")
+    pegasus_graph = pegasus.to_networkx_graph()
+
+    for i in range(90):
+        pegasus_graph.remove_node(2910 + i)
+        pegasus_graph.remove_node(2760 + i)
+
+    for i in range(30):
+        pegasus_graph.remove_node(30 + i)
+        pegasus_graph.remove_node(5700 + i)
+    c = 0
+
+    while True:
+
+        h = {node: rng.uniform(-1, 1) for node in chimera_graph.nodes}
+        J = {edge: rng.uniform(-1, 1) for edge in chimera_graph.edges}
+
+        with open("/home/tsmierzchalski/pycharm_projects/D-Wave_Scripts/data/chimera.txt", "a") as f:
+            f.write(str(h) + "\n")
+            f.write(str(J) + "\n")
+            f.write("\n")
+
+        sampleset = chimera.sample_ising(h, J, num_reads=1000)
+        df = sampleset.to_pandas_dataframe(sample_column=True)
+        df.to_csv(f"/home/tsmierzchalski/pycharm_projects/D-Wave_Scripts/data/chimera_{c}.csv")
+
+        h = {node: rng.uniform(-1, 1) for node in pegasus_graph.nodes}
+        J = {edge: rng.uniform(-1, 1) for edge in pegasus_graph.edges}
+
+        with open("/home/tsmierzchalski/pycharm_projects/D-Wave_Scripts/data/pegasus.txt", "a") as f:
+            f.write(str(h) + "\n")
+            f.write(str(J) + "\n")
+            f.write("\n")
+
+        sampleset = pegasus.sample_ising(h, J, num_reads=1000)
+        df = sampleset.to_pandas_dataframe(sample_column=True)
+        df.to_csv(f"/home/tsmierzchalski/pycharm_projects/D-Wave_Scripts/data/pegasus_{c}.csv")
+
+        c += 1
 
     """
     h, J = get_pegasus("/home/tsmierzchalski/pycharm_projects/D-Wave_Scripts/instances/normal/P4", "001")
@@ -151,8 +192,6 @@ if __name__ == "__main__":
     sampleset = sampler.sample_ising(h, J, num_reads=1, label="test")
     dwave.inspector.show(sampleset)
     """
-
-
 
     """
     annealing_times = [min_time, default_time] #[min_time, default_time, long_time]

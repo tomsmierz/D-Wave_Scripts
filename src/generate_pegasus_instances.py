@@ -89,21 +89,38 @@ def find_map(size: int):
 
 
 def generate_pegasus_instances(number: int, size: int, out: str, distribution: str):
-    pegasus = dnx.pegasus_graph(size, fabric_only=True, nice_coordinates=True)
-
+    pegasus = dnx.pegasus_graph(size, fabric_only=True) #nice_coordinates=True)
+    sampler = DWaveSampler(solver="Advantage_system6.1")
     #pegasus = sampler.to_networkx_graph()
 
-    sampler = DWaveSampler(solver="Advantage_system6.1")
 
+    real_edges = sampler.edgelist
+    real_nodes = sampler.nodelist
+    broken_nodes = list(set(pegasus.nodes) - set(real_nodes))
+    for i in range(90):
+        pegasus.remove_node(2910 + i)
+        pegasus.remove_node(2760 + i)
+
+    for i in range(30):
+        pegasus.remove_node(30 + i)
+        pegasus.remove_node(5700 + i)
+
+    for i in broken_nodes:
+        pegasus.remove_node(i)
+
+    for e in [(161, 5100), (2032, 4270), (641, 5118), (4832, 4833)]:
+        pegasus.remove_edge(e[0], e[1])
 
     for i in tqdm(range(number), desc="generating pegasus instances: "):
 
-        nodes = nx.get_node_attributes(pegasus, "linear_index")
+
+        #nodes = nx.get_node_attributes(pegasus, "linear_index")
+
 
         if distribution == "normal":
-            couplings = {edge: rng.normal(0, 1) for edge in pegasus.edges}
+            couplings = {edge: J_range() for edge in pegasus.edges}
             #couplings = normalize(couplings)
-            bias = {node: rng.normal(0, 1) for node in pegasus.nodes}
+            bias = {node: h_range() for node in pegasus.nodes}
         if distribution == "uniform":
             couplings = {edge: rng.uniform(-1, 1) for edge in pegasus.edges}
             bias = {node: rng.uniform(-4, 4) for node in pegasus.nodes}
@@ -112,18 +129,22 @@ def generate_pegasus_instances(number: int, size: int, out: str, distribution: s
         nx.set_node_attributes(pegasus, bias, "h")
         nx.set_edge_attributes(pegasus, couplings, "J")
 
-        #name = f"00{i+1}"[-3:]
-        name = f"{101 + i}"
+        name = f"00{i+1}"[-3:]
+        #name = f"{101 + i}"
         name = name + ".txt"
 
         with open(os.path.join(out, name), "w") as f:
             f.write("# \n")
-
             for node in pegasus.nodes.data("h"):
-                f.write(str(nodes[node[0]] + 1) + " " + str(nodes[node[0]] + -11) + " " + str(node[1]) + "\n")
+                f.write(str(node[0] + 1) + " " + str(node[0] + 1) + " " + str(node[1]) + "\n")
             for edge in pegasus.edges.data("J"):
-                f.write(str(nodes[edge[0]] + 1) + " " + str(nodes[edge[1]] + -11) + " " + str(edge[2]) + "\n")
-
+                f.write(str(edge[0] + 1) + " " + str(edge[1] + 1) + " " + str(edge[2]) + "\n")
+"""
+            for node in pegasus.nodes.data("h"):
+                f.write(str(nodes[node[0]] + 1) + " " + str(nodes[node[0]] + 1) + " " + str(node[1]) + "\n")
+            for edge in pegasus.edges.data("J"):
+                f.write(str(nodes[edge[0]] + 1) + " " + str(nodes[edge[1]] + 1) + " " + str(edge[2]) + "\n")
+"""
 
 
 def generate_pegasus_map(number: int, size: int, out: str, mapping: int, wrong_edges = None):
@@ -179,10 +200,10 @@ if __name__ == "__main__":
     if args.number and args.number >= 1000:
         parser.error("Maximum number of generated instances is 999.")
 
-    #generate_pegasus_instances(args.number, args.size, args.path, args.distribution)
+    generate_pegasus_instances(args.number, args.size, args.path, args.distribution)
 
-    mapping, edges = find_map(args.size)
-    generate_pegasus_map(args.number, args.size, args.path, mapping, edges)
+    #mapping, edges = find_map(args.size)
+    #generate_pegasus_map(args.number, args.size, args.path, mapping, edges)
 #P2
 """
 for i in range(6):
