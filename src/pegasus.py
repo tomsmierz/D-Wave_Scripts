@@ -138,6 +138,12 @@ with open(os.path.join(path, f"energies_P16_greedy.txt"), "w") as f:
 
 if __name__ == "__main__":
 
+    h, J = get_pegasus("/home/tsmierzchalski/pycharm_projects/D-Wave_Scripts/instances/normal/P4", "001")
+
+    sampleset = sampler.sample_ising(h, J, num_reads=1, label="test")
+    dwave.inspector.show(sampleset)
+
+"""
     annealing_times = [min_time, default_time, long_time]  # [min_time, default_time, long_time]
     path = "/home/tsmierzchalski/pycharm_projects/D-Wave_Scripts/instances/normal/P16"
     name = "P16_normal"
@@ -184,16 +190,9 @@ if __name__ == "__main__":
         df = sampleset.to_pandas_dataframe(sample_column=True)
         df.to_csv(f"/home/tsmierzchalski/pycharm_projects/D-Wave_Scripts/data/pegasus_{c}.csv")
 
-        c += 1
+        c += 1"""
 
-    """
-    h, J = get_pegasus("/home/tsmierzchalski/pycharm_projects/D-Wave_Scripts/instances/normal/P4", "001")
-
-    sampleset = sampler.sample_ising(h, J, num_reads=1, label="test")
-    dwave.inspector.show(sampleset)
-    """
-
-    """
+"""
     annealing_times = [min_time, default_time] #[min_time, default_time, long_time]
     for pg in ["pegasus_2x2x3"]: #, "pegasus_3x3x3", "Pegasus_4x4x3"]:
         for x in os.scandir(f"C:/Users/walle/PycharmProjects/D-Wave_Scripts/instances/pegasus/{pg}"):
