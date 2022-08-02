@@ -1,10 +1,12 @@
 import networkx as nx
 import dwave_networkx as dnx
 import pandas as pd
+import random as rn
 
 from src.pegasus import get_pegasus
 from tqdm import tqdm
 from typing import Dict
+
 
 import os
 
@@ -41,6 +43,13 @@ def dattani_to_linear(h_dattani: Dict, size: int) -> Dict:
 
     return h_linear
 
+def dattani_to_linear_2(h_dattani: Dict, size: int) -> Dict:
+    h_linear = {}
+    for key, value in h_dattani.items():
+        h_linear[key] = 24*(size-1) * value[0] + 24 * value[2] + 8 * value[1] + 4 * value[3] + value[4] + 1
+
+    return h_linear
+
 
 def renumerate(instance_path: str, name: str, size: int):
     h, J = get_pegasus(instance_path, name)
@@ -49,7 +58,7 @@ def renumerate(instance_path: str, name: str, size: int):
     J_rn = {}
     i = 1
     for key in h.keys():
-        rn[key] = dattani_to_linear(tuple_to_dattani(machine_to_5_tuple(h)), size)[key]
+        rn[key] = dattani_to_linear_2(tuple_to_dattani(machine_to_5_tuple(h)), size)[key]
 
 
 
@@ -60,7 +69,7 @@ def renumerate(instance_path: str, name: str, size: int):
 
     name = name + ".txt"
 
-    with open(os.path.join(f"/home/tsmierzchalski/pycharm_projects/D-Wave_Scripts/instances_renumerated/uniform/P{size}", name), "w") as f:
+    with open(os.path.join(f"/home/tsmierzchalski/pycharm_projects/D-Wave_Scripts/instances_renumerated_2/uniform/P{size}", name), "w") as f:
         f.write("# \n")
 
         h_rn_sorted = {k: h_rn[k] for k in sorted(h_rn)}
@@ -74,11 +83,13 @@ def renumerate(instance_path: str, name: str, size: int):
 
 if __name__ == "__main__":
 
-    x = nx.complete_bipartite_graph([],[])
-
-    """
-    for i in tqdm(range(100)):
+    for i in tqdm(range(1)):
         name = f"00{i+1}"[-3:]
-        renumerate("/home/tsmierzchalski/pycharm_projects/D-Wave_Scripts/instances/uniform/P16", name, 16)
+        renumerate("/home/tsmierzchalski/pycharm_projects/D-Wave_Scripts/instances/uniform/P4", name, 4)
 
-"""
+
+""" d = {}
+    for i in range(5):
+        x = (rn.randint(0,14), rn.randint(0,14), rn.randint(0,2), rn.randint(0,1), rn.randint(0,3))
+        d[x] = x
+    print(dattani_to_linear(d, 16))"""
