@@ -34,8 +34,25 @@ def get_pegasus(path: str, name: str = "001"):
     for index, row in df.iterrows():
         if row[0] == row[1]:
             h[int(row[0] - 1)] = row[2]
+            #h[int(row[0])] = row[2]
         else:
             J[(int(row[0] - 1), int(row[1] - 1))] = row[2]
+            #J[(int(row[0]), int(row[1]))] = row[2]
+    return h, J
+
+
+def get_pegasus_tuple(path: str, name: str = "001"):
+    df = pd.read_csv(os.path.join(path, f"{name}.txt"),
+                     sep=";", index_col=False, skiprows=1, header=None)
+    h = {}
+    J = {}
+    for index, row in df.iterrows():
+        if row[0] == row[1]:
+            #h[int(row[0] - 1)] = row[2]\
+            h[eval(row[0])] = row[2]
+        else:
+            #J[(int(row[0] - 1), int(row[1] - 1))] = row[2]
+            J[(eval(row[0]), eval(row[1]))] = row[2]
     return h, J
 
 
@@ -137,11 +154,16 @@ with open(os.path.join(path, f"energies_P16_greedy.txt"), "w") as f:
 """
 
 if __name__ == "__main__":
+    for i in tqdm(range(10)):
+        name = f"00{i+1}"[-3:]
+        name = name + "_nd"
+        h, J = get_pegasus("/home/tsmierzchalski/instances/P8", name)
 
-    h, J = get_pegasus("/home/tsmierzchalski/pycharm_projects/D-Wave_Scripts/instances/normal/P4", "001")
-
-    sampleset = sampler.sample_ising(h, J, num_reads=1, label="test")
-    dwave.inspector.show(sampleset)
+        sampleset = sampler.sample_ising(h, J, num_reads=100, label="test")
+        with open(os.path.join("/home/tsmierzchalski/instances/results_dwave", "P8_100.txt"), "a") as f:
+            f.write(name + " " + str(sampleset.first[1]) + "\n")
+    #sampleset = sampler.sample_ising(h, J, num_reads=1, label="test")
+    #dwave.inspector.show(sampleset)
 
 """
     annealing_times = [min_time, default_time, long_time]  # [min_time, default_time, long_time]
