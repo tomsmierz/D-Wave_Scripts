@@ -94,7 +94,7 @@ def find_map(size: int):
     return mapping, edges
 
 
-def generate_pegasus_instances(number: int, size: int, out: str, distribution: str):
+def generate_pegasus_instances_old(number: int, size: int, out: str, distribution: str):
     pegasus = dnx.pegasus_graph(size, nice_coordinates=True)
     sampler = DWaveSampler(solver="Advantage_system6.1")
     #pegasus = sampler.to_networkx_graph()
@@ -193,102 +193,13 @@ def generate_pegasus_map(number: int, size: int, out: str, mapping: int, wrong_e
                 f.write(str(edge[0][0]) + ";" + str(edge[0][1]) + ";" + str(value) + "\n")
 
 
-if __name__ == "__main__":
+def generate_pegasus_nd_instances(number: int, size: int, out: str, mapping: int, wrong_edges = None):
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-P", "--size", type=int, choices=[i + 1 for i in range(16)], default=4,
-                        help="Size of the chimera graph. Default is 4 (P4).")
-    parser.add_argument("-N", "--number", type=int, default=1,
-                        help="Number of instances to be generated. Default is 1, maximum 999.")
-    parser.add_argument("-D", "--distribution", type=str, default="uniform", choices=["normal", "uniform"],
-                        help="Distribution of biases and couplings")
-    parser.add_argument("--path", type=str, default=path,
-                        help="path to folder where generated instances will be located. Default is working directory")
+    source = dnx.pegasus_graph(size, nice_coordinates=True)
+    target = sampler.to_networkx_graph()
 
-    args = parser.parse_args()
-
-    if args.number and args.number >= 1000:
-        parser.error("Maximum number of generated instances is 999.")
-
-    #generate_pegasus_instances(args.number, args.size, args.path, args.distribution)
-
-    mapping, edges = find_map(args.size)
-    generate_pegasus_map(args.number, args.size, args.path, mapping, edges)
-#P2
-"""
-for i in range(6):
-    graph.remove_node(26 + i)
-    graph.remove_node(16 + i)
-
-for i in range(2):
-    graph.remove_node(44 + i)
-    graph.remove_node(2 + i)
-"""
-
-#P4
-"""
-for i in range(18):
-    pegasus.remove_node(150 + i)
-    pegasus.remove_node(120 + i)
-
-for i in range(6):
-    pegasus.remove_node(6 + i)
-    pegasus.remove_node(276 + i)
-
-"""
-
-#P8
-
-"""
-for i in range(42):
-    pegasus.remove_node(686 + i)
-    pegasus.remove_node(616 + i)
-
-for i in range(14):
-    pegasus.remove_node(14 + i)
-    pegasus.remove_node(1316 + i)
-
-"""
-
-
-#P16
-
-"""
-    for i in range(90):
-        pegasus.remove_node(2910 + i)
-        pegasus.remove_node(2760 + i)
-
-    for i in range(30):
-        pegasus.remove_node(30 + i)
-        pegasus.remove_node(5700 + i)
-
-    for i in broken_nodes:
-        pegasus.remove_node(i)
-
-    for e in [(161, 5100), (2032, 4270), (641, 5118), (4832, 4833)]:
-        pegasus.remove_edge(e[0], e[1])
-"""
-
-"""    real_edges = sampler.edgelist
-    real_nodes = sampler.nodelist
-    broken_nodes = list(set(pegasus.nodes) - set(real_nodes))
-    for i in range(90):
-        pegasus.remove_node(2910 + i)
-        pegasus.remove_node(2760 + i)
-
-    for i in range(30):
-        pegasus.remove_node(30 + i)
-        pegasus.remove_node(5700 + i)
-
-    for i in broken_nodes:
-        pegasus.remove_node(i)
-
-    for e in [(161, 5100), (2032, 4270), (641, 5118), (4832, 4833)]:
-        pegasus.remove_edge(e[0], e[1])"""
-
-
-"""    for y in [0, 1]:
-        for x in [1, 2]:
+    for y in range(size - 1):
+        for x in range(1, size):
             for i in range(4):
                 h = (0, y, x, 0, i)
                 h1 = (2, y + 1, x - 1, 1, 0)
@@ -301,4 +212,74 @@ for i in range(14):
                         source.remove_edge(h, e)
                 for e in [v1, v2]:
                     if source.has_edge(v, e):
-                        source.remove_edge(v, e)"""
+                        source.remove_edge(v, e)
+
+    mappings = [mapping for mapping in dnx.pegasus_sublattice_mappings(source, target)]
+
+    l = {node: mappings[mapping](node) for node in source.nodes()}
+    nx.set_node_attributes(source, l, "mapping")
+
+    em = nx.get_node_attributes(source, "mapping")
+    for i in tqdm(range(number), desc="generating pegasus instances: "):
+
+        h = {item: rng.uniform(-4, 4) for item in em.items()}
+        J = {(edge, (em[edge[0]], em[edge[1]])): rng.uniform(-1, 1) for edge in source.edges()}
+
+        #h = {node: h_range() for node in em.values()}
+        #J = {(em[edge[0]], em[edge[1]]): J_range() for edge in source.edges()}
+
+        del J[(((2, 4, 6, 0, 3), (2, 4, 6, 1, 0)), (2032, 4270))]
+        name_basic = f"00{i + 1}"[-3:]
+        name = name_basic + "_nd" + ".txt"
+        name_orig = name_basic + "_nd_original.txt"
+        with open(os.path.join(out, name), "w") as f:
+            f.write("# \n")
+
+            for node, value in h.items():
+                f.write(str(node[1] + 1) + " " + str(node[1] + 1) + " " + str(value) + "\n")
+            for edge, value in J.items():
+                f.write(str(edge[1][0] + 1) + " " + str(edge[1][1] + 1) + " " + str(value) + "\n")
+            #if wrong_edges is not None:
+            #    for edge in wrong_edges:
+            #        f.write(str(edge[0] + 1) + " " + str(edge[1] + 1) + " " + str(0) + "\n")
+
+        with open(os.path.join(out, name_orig), "w") as f:
+            f.write("# \n")
+
+            for node, value in h.items():
+                f.write(str(node[0]) + ";" + str(node[0]) + ";" + str(value) + "\n")
+            for edge, value in J.items():
+                f.write(str(edge[0][0]) + ";" + str(edge[0][1]) + ";" + str(value) + "\n")
+
+
+def generate_pegasus_instances(number: int, size: int, out: str, instance_class: str, device: bool, no_diagonal: bool):
+    source = dnx.pegasus_graph(size, nice_coordinates=True)
+
+    if device:
+        target = sampler.to_networkx_graph()
+
+
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-P", "--size", type=int, choices=[i + 1 for i in range(16)], default=4,
+                        help="Size of the pegasus graph. Default is 4 (P4).")
+    parser.add_argument("-N", "--number", type=int, default=1,
+                        help="Number of instances to be generated. Default is 1, maximum 999.")
+    parser.add_argument("-I", "--class", type=str, default="RAU", choices=["RAU", "RAC", "AC3"],
+                        help="Class of generated instances. RAU - random uniform, RAC - random couplings only, "
+                             "AC3 - anti-cluster")
+    #parser.add_argument("-D", "--distribution", type=str, default="uniform", choices=["normal", "uniform"],
+    #                    help="Distribution of biases and couplings")
+    parser.add_argument("--path", type=str, default=path,
+                        help="path to folder where generated instances will be located. Default is working directory")
+
+    args = parser.parse_args()
+
+    if args.number and args.number >= 1000:
+        parser.error("Maximum number of generated instances is 999.")
+
+    #generate_pegasus_instances(args.number, args.size, args.path, args.distribution)
+
+    # mapping, edges = find_map(args.size)
+    # generate_pegasus_map(args.number, args.size, args.path, mapping, edges)
