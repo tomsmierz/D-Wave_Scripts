@@ -14,7 +14,7 @@ def generate_chimera_instance(number: int, size: int, out: str):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-C", "--size", type=int, choices=[i+1 for i in range(16)], default=4,
+    parser.add_argument("-S", "--size", type=int, choices=[i+1 for i in range(16)], default=4,
                         help="Size of the chimera graph. Default is 4 (C4).")
     parser.add_argument("-N", "--number", type=int, default=1,
                         help="Number of instances to be generated. Default is 1, Maximum 999.")
