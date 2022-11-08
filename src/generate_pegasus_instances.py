@@ -304,7 +304,6 @@ def generate_pegasus_instances(number: int, size: int, output_path: str, output_
         name = f"00{i+1}"[-3:]
         name = name + ".txt"
 
-
         with open(os.path.join(output_path, name), "w") as f:
             f.write("# \n")
             for node, value in bias.items():
