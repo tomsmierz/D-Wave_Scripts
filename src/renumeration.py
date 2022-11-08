@@ -3,7 +3,7 @@ import dwave_networkx as dnx
 import pandas as pd
 import random as rn
 
-from src.pegasus import get_pegasus, get_pegasus_tuple
+from src.utils import load_pegasus, load_pegasus_tuple
 from tqdm import tqdm
 from typing import Dict
 
@@ -74,7 +74,7 @@ def dattani_to_linear_2(h_dattani: Dict, size: int) -> Dict:
 
 
 def renumerate(instance_path: str, name: str, size: int):
-    h, J = get_pegasus_tuple(instance_path, name)
+    h, J = load_pegasus_tuple(instance_path, name)
     rn = {}
     h_rn = {}
     J_rn = {}
