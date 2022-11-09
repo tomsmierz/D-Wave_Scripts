@@ -4,7 +4,7 @@ import argparse
 import numpy as np
 import os
 
-from typing import Dict
+from typing import Dict, Tuple
 from dwave.system import DWaveSampler
 from dwave.cloud import Client
 from tqdm import tqdm
@@ -22,6 +22,7 @@ def normalize(d: Dict) -> Dict:
         normalized[key] = d[key]/max_value
     return normalized
 
+
 def h_range():
     low = -4.0
     high = 4.0
@@ -32,6 +33,7 @@ def h_range():
     elif value < low:
         r = low
     return r
+
 
 def J_range():
     low = -1.0
@@ -47,6 +49,20 @@ def J_range():
 
 def rn(s):
     return dnx.pegasus_coordinates(16).linear_to_nice(s)
+
+
+def tuple_to_spin_glass(node: Tuple, size: int) -> int:
+    t, y, x, u, k = node
+    if u == 1:
+        a = 4 + k + 1
+    else:
+        a = abs(k - 3) + 1
+    b = abs(y - (size - 2))
+
+    spin_glas_linear = 8 * t + 24 * x + 24 * (size - 1) * b + a
+    # 24 * (size - 1) * value[0] + 24 * value[1] + 8 * value[2] + 4 * value[3] + value[4] + 1
+    return spin_glas_linear
+
 
 
 def find_map(size: int):
