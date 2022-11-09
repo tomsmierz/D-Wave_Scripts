@@ -251,33 +251,74 @@ def generate_pegasus_nd_instances(number: int, size: int, out: str, mapping: int
             for edge, value in J.items():
                 f.write(str(edge[0][0]) + ";" + str(edge[0][1]) + ";" + str(value) + "\n")
 
+    def generate_pegasus_instances(number: int, size: int, output_path: str, output_type: str,
+                                   category: str, no_diagonal: bool):
 
-def generate_pegasus_instances(number: int, size: int, out: str, instance_class: str, device: bool, no_diagonal: bool):
-    source = dnx.pegasus_graph(size, nice_coordinates=True)
+        source = dnx.pegasus_graph(size, nice_coordinates=True)
 
-    if device:
-        target = sampler.to_networkx_graph()
+        if no_diagonal:
+            for y in range(size - 1):
+                for x in range(1, size):
+                    for i in range(4):
+                        h = (0, y, x, 0, i)
+                        h1 = (2, y + 1, x - 1, 1, 0)
+                        h2 = (2, y + 1, x - 1, 1, 1)
+                        v = (0, y, x, 1, i)
+                        v1 = (2, y + 1, x - 1, 0, 2)
+                        v2 = (2, y + 1, x - 1, 0, 3)
+                        for e in [h1, h2]:
+                            if source.has_edge(h, e):
+                                source.remove_edge(h, e)
+                        for e in [v1, v2]:
+                            if source.has_edge(v, e):
+                                source.remove_edge(v, e)
 
+        if output_type == "SpinGlass":
+            nodes = sorted([tuple_to_spin_glass(node, size) for node in source.nodes])
+            edges = sorted([(tuple_to_spin_glass(node1, size), tuple_to_spin_glass(node2, size))
+                            for (node1, node2) in source.edges])
+        else:
+            raise NotImplementedError("Other formats of output not implemented yet")
 
-if __name__ == "__main__":
+        for i in tqdm(range(number), desc="generating pegasus instances: "):
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-P", "--size", type=int, choices=[i + 1 for i in range(16)], default=4,
-                        help="Size of the pegasus graph. Default is 4 (P4).")
-    parser.add_argument("-N", "--number", type=int, default=1,
-                        help="Number of instances to be generated. Default is 1, maximum 999.")
-    parser.add_argument("-I", "--class", type=str, default="RAU", choices=["RAU", "RAC", "AC3"],
-                        help="Class of generated instances. RAU - random uniform, RAC - random couplings only, "
-                             "AC3 - anti-cluster")
-    #parser.add_argument("-D", "--distribution", type=str, default="uniform", choices=["normal", "uniform"],
-    #                    help="Distribution of biases and couplings")
-    parser.add_argument("--path", type=str, default=path,
-                        help="path to folder where generated instances will be located. Default is working directory")
+            if category == "RAU":
+                couplings = {edge: rng.uniform(-1, 1) for edge in edges}
+                bias = {node: rng.uniform(-0.1, 0.1) for node in nodes}
+            else:
+                raise NotImplementedError("Categories other than RAU not implemented yet")
 
-    args = parser.parse_args()
+            name = f"00{i + 1}"[-3:]
+            name = name + ".txt"
 
-    if args.number and args.number >= 1000:
-        parser.error("Maximum number of generated instances is 999.")
+            with open(os.path.join(output_path, name), "w") as f:
+                f.write("# \n")
+                for node, value in bias.items():
+                    f.write(str(node) + " " + str(node) + " " + str(value) + "\n")
+                for edge, value in couplings.items():
+                    f.write(str(edge[0]) + " " + str(edge[1]) + " " + str(value) + "\n")
+
+    if __name__ == "__main__":
+
+        parser = argparse.ArgumentParser()
+        parser.add_argument("-S", "--size", type=int, default=4,
+                            help="Size of the pegasus graph. Minimum 2. Default is 4 (P4).")
+        parser.add_argument("-N", "--number", type=int, default=1,
+                            help="Number of instances to be generated. Default is 1, maximum 999.")
+        parser.add_argument("-C", "--category", type=str, default="RAU", choices=["RAU", "RAC", "AC3"],
+                            help="Category of generated instances. RAU - random uniform, RAC - random couplings only, "
+                                 "AC3 - anti-cluster")
+        parser.add_argument("--path", type=str, default=path,
+                            help="path to folder where generated instances will be located. Default is working directory")
+
+        args = parser.parse_args()
+
+        if args.number and args.number >= 1000:
+            parser.error("Maximum number of generated instances is 999.")
+        if args.size and args.size < 2:
+            parser.error("Minimum size of pegasus instance is 2")
+
+        generate_pegasus_instances(args.number, args.size, args.path, "SpinGlass", args.category, no_diagonal=False)
 
     #generate_pegasus_instances(args.number, args.size, args.path, args.distribution)
 
