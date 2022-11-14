@@ -4,7 +4,7 @@ import argparse
 import numpy as np
 import os
 
-from typing import Dict, Tuple, Union
+from typing import Dict, Tuple, Union, Optional
 from dwave.system import DWaveSampler
 from dwave.cloud import Client
 from tqdm import tqdm
@@ -120,12 +120,14 @@ def generate_pegasus_map(number: int, size: int, out: str, mapping: int, sampler
 
 
 def generate_pegasus_instances(number: int, size: int, output_path: str, output_type: str,
-                               category: str, diagonal: bool = True, device: str = None):
+                               category: str, diagonal: bool = True, device: Optional[str] = None) -> None:
 
     source = dnx.pegasus_graph(size, nice_coordinates=True)
 
     if device is not None:
-        assert device in ["Advantage_system4.1", "Advantage_system5.2", "Advantage_system6.1"], "Invalid device"
+        if device not in ["Advantage_system4.1", "Advantage_system5.2", "Advantage_system6.1"]:
+            raise AssertionError("Device should be set to \"Advantage_system4.1\", \"Advantage_system5.2\", "
+                                 "\"Advantage_system6.1\" or None")
         sampler = DWaveSampler(solver=device)
         target = sampler.to_networkx_graph()
 
@@ -153,8 +155,8 @@ def generate_pegasus_instances(number: int, size: int, output_path: str, output_
     elif device is not None:
         raise NotImplementedError("Embedding to device not implemented yet")
     else:
-        nodes = source.nodes
-        edges = source.edges
+        nodes = source.nodes()
+        edges = source.edges()
 
     for i in tqdm(range(number), desc="generating pegasus instances: "):
 
