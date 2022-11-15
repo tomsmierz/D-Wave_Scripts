@@ -30,29 +30,27 @@ def tuple_to_spin_glass(node: Tuple, size: int) -> int:
     return spin_glas_linear
 
 
-def find_map(size: int, sampler):
-    source = dnx.pegasus_graph(size, nice_coordinates=True)
-    # target = dnx.pegasus_graph(16, nice_coordinates=True)
-    target = sampler.to_networkx_graph()
+def find_map(source: nx.Graph, target: nx.Graph):
 
-    mappings = [mapping for mapping in dnx.pegasus_sublattice_mappings(source, target)]
+    mappings = [mapp for mapp in dnx.pegasus_sublattice_mappings(source, target)]
     mapping = None
-    edges = None
-    if size<8:
-        for i in tqdm(range(len(mappings)), desc="Searching for perfect mapping"):
+    missing_edges = None
+    missing_nodes = None
 
-            l = {node: mappings[i](node) for node in source.nodes()}
-            nx.set_node_attributes(source, l, "mapping")
+    for i in tqdm(range(len(mappings)), desc="Searching for a perfect mapping"):
 
-            em = nx.get_node_attributes(source, "mapping")
+        l = {node: mappings[i](node) for node in source.nodes()}
+        nx.set_node_attributes(source, l, "mapping")
 
-            h = {node: rng.uniform(-4, 4) for node in em.values()}
-            # print(all(node in sampler.nodelist for node in h.keys()))
-            J = {(em[edge[0]], em[edge[1]]): rng.uniform(-1, 1) for edge in source.edges()}
-            # print(all(edge in sampler.edgelist for edge in J.keys()))
-            if all(node in sampler.nodelist for node in h.keys()) and all(edge in sampler.edgelist for edge in J.keys()):
-                mapping = i
-                break
+        em = nx.get_node_attributes(source, "mapping")
+
+        h = {node: rng.uniform(-4, 4) for node in em.values()}
+        # print(all(node in sampler.nodelist for node in h.keys()))
+        J = {(em[edge[0]], em[edge[1]]): rng.uniform(-1, 1) for edge in source.edges()}
+        # print(all(edge in sampler.edgelist for edge in J.keys()))
+        if all(node in target.nodelist for node in h.keys()) and all(edge in target.edgelist for edge in J.keys()):
+            mapping = i
+            break
 
     if mapping is None:
         proposed = {}
@@ -130,6 +128,7 @@ def generate_pegasus_instances(number: int, size: int, output_path: str, output_
                                  "\"Advantage_system6.1\" or None")
         sampler = DWaveSampler(solver=device)
         target = sampler.to_networkx_graph()
+        mappings = [mapp for mapp in dnx.pegasus_sublattice_mappings(source, target)]
 
     if not diagonal:
         for y in range(size - 1):
