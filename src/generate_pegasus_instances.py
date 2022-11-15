@@ -3,6 +3,7 @@ import networkx as nx
 import argparse
 import numpy as np
 import os
+import pickle
 
 from typing import Dict, Tuple, Union, Optional, List, Callable
 from dwave.system import DWaveSampler
@@ -27,7 +28,6 @@ def tuple_to_spin_glass(node: Tuple, size: int) -> int:
     b = abs(y - (size - 2))
 
     spin_glas_linear = 8 * t + 24 * x + 24 * (size - 1) * b + a
-    # 24 * (size - 1) * value[0] + 24 * value[1] + 8 * value[2] + 4 * value[3] + value[4] + 1
     return spin_glas_linear
 
 
@@ -82,7 +82,7 @@ def find_map(source: nx.Graph, target: nx.Graph, sampler: DWaveSampler) -> \
     return mapping, missing_nodes, missing_edges
 
 
-def generate_pegasus_instances(number: int, size: int, output_path: str, output_type: str,
+def generate_pegasus_instances(number: int, size: int, output_path: str, output_types: List[str],
                                category: str, diagonal: bool = True, device: Optional[str] = None) -> None:
 
     source = dnx.pegasus_graph(size, nice_coordinates=True)
@@ -92,8 +92,8 @@ def generate_pegasus_instances(number: int, size: int, output_path: str, output_
             raise AssertionError("Device should be set to \"Advantage_system4.1\", \"Advantage_system5.2\", "
                                  "\"Advantage_system6.1\" or None")
         sampler = DWaveSampler(solver=device)
-        target = sampler.to_networkx_graph()
-        mappings = [mapp for mapp in dnx.pegasus_sublattice_mappings(source, target)]
+        target = dnx.pegasus_graph(16, nice_coordinates=True)
+        mapping, missing_nodes, missing_edges = find_map(source, target, sampler)
 
     if not diagonal:
         for y in range(size - 1):
@@ -112,40 +112,42 @@ def generate_pegasus_instances(number: int, size: int, output_path: str, output_
                         if source.has_edge(v, e):
                             source.remove_edge(v, e)
 
-    if output_type == "SpinGlass":
-        nodes = sorted([tuple_to_spin_glass(node, size) for node in source.nodes])
-        edges = sorted([(tuple_to_spin_glass(node1, size), tuple_to_spin_glass(node2, size))
-                        for (node1, node2) in source.edges])
-    elif device is not None:
-        raise NotImplementedError("Embedding to device not implemented yet")
-    else:
-        nodes = source.nodes()
-        edges = source.edges()
+    renumerated = False  # Flag for operation of renumeration
 
     for i in tqdm(range(number), desc="generating pegasus instances: "):
 
         if category == "RAU":
-            couplings = {edge: rng.uniform(-1, 1) for edge in edges}
-            bias = {node: rng.uniform(-0.1, 0.1) for node in nodes}
+            couplings = {edge: rng.uniform(-1, 1) for edge in source.edges()}
+            bias = {node: rng.uniform(-0.1, 0.1) for node in source.nodes()}
         else:
             raise NotImplementedError("Categories other than RAU not implemented yet")
 
         name = f"00{i + 1}"[-3:]
 
-        if output_type == "SpinGlass":
-            name = name + "_sg.txt"
-            with open(os.path.join(output_path, name), "w") as f:
-                f.write("# \n")
-                for node, value in bias.items():
-                    f.write(str(node) + " " + str(node) + " " + str(value) + "\n")
-                for edge, value in couplings.items():
-                    f.write(str(edge[0]) + " " + str(edge[1]) + " " + str(value) + "\n")
+        for output_type in output_types:
+            if output_type == "SpinGlass":
 
-        if output_type == "Original":
-            pass
+                if not renumerated:
+                    sg_nodes = sorted([tuple_to_spin_glass(node, size) for node in source.nodes])
+                    sg_edges = sorted([(tuple_to_spin_glass(node1, size), tuple_to_spin_glass(node2, size))
+                                    for (node1, node2) in source.edges])
+                    renumerated = True
 
-        if output_type == "MatrixMarket":
-            pass
+                output_name = name + "_sg.txt"
+                with open(os.path.join(output_path, output_name), "w") as f:
+                    f.write("# \n")
+                    for node, value in bias.items():
+                        f.write(str(node) + " " + str(node) + " " + str(value) + "\n")
+                    for edge, value in couplings.items():
+                        f.write(str(edge[0]) + " " + str(edge[1]) + " " + str(value) + "\n")
+
+            if output_type == "DWave":
+                output_name = name + "_dv.pkl"
+                with open(os.path.join(output_path, output_name), "wb") as f:
+                    data = []
+
+            if output_type == "MatrixMarket":
+                raise NotImplementedError("MatrixMarket output not implemented yet")
 
 
 if __name__ == "__main__":
@@ -161,19 +163,21 @@ if __name__ == "__main__":
     parser.add_argument("-P", "--path", type=str, default=path,
                         help="path to folder where generated instances will be located. "
                              "Default is working directory")
-    parser.add_argument("-T", "--type", type=str, default="Device",
-                        choices=["SpinGlass", "Original", "MatrixMarket"], nargs="*")
+    parser.add_argument("-T", "--types", type=str, default="SpinGlass",
+                        choices=["SpinGlass", "DWave", "MatrixMarket"], nargs="*")
     parser.add_argument("--diag", type=bool, default=True,
                         help="Generate pegasus instances with or without \"diagonal\" connections")
+    parser.add_argument("-D", "--device", type=Union[str, None], default=None,
+                        choices=["Advantage_system4.1", "Advantage_system5.2", "Advantage_system6.1", None],
+                        help="Map instance info physical D-Wave's device. Input None for no Mapping")
 
     args = parser.parse_args()
 
     if args.size and args.size < 2:
         parser.error("Minimum size of pegasus instance is 2")
 
-    for output_type in args.type:
-        generate_pegasus_instances(args.number, args.size, args.path, output_type,
-                                   args.category, diagonal=args.diag)
+    generate_pegasus_instances(args.number, args.size, args.path, args.types,
+                               args.category, diagonal=args.diag)
 
 #generate_pegasus_instances(args.number, args.size, args.path, args.distribution)
 
