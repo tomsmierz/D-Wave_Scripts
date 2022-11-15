@@ -82,50 +82,6 @@ def find_map(source: nx.Graph, target: nx.Graph, sampler: DWaveSampler) -> \
     return mapping, missing_nodes, missing_edges
 
 
-def generate_pegasus_map(number: int, size: int, out: str, mapping: int, sampler, wrong_edges = None, ):
-
-    source = dnx.pegasus_graph(size, nice_coordinates=True)
-    # target = dnx.pegasus_graph(16, nice_coordinates=True)
-    target = sampler.to_networkx_graph()
-
-    mappings = [mapping for mapping in dnx.pegasus_sublattice_mappings(source, target)]
-
-    l = {node: mappings[mapping](node) for node in source.nodes()}
-    nx.set_node_attributes(source, l, "mapping")
-
-    em = nx.get_node_attributes(source, "mapping")
-    for i in tqdm(range(number), desc="generating pegasus instances: "):
-
-        h = {item: rng.uniform(-4, 4) for item in em.items()}
-        J = {(edge, (em[edge[0]], em[edge[1]])): rng.uniform(-1, 1) for edge in source.edges()}
-
-        #h = {node: h_range() for node in em.values()}
-        #J = {(em[edge[0]], em[edge[1]]): J_range() for edge in source.edges()}
-
-        del J[(((2, 4, 6, 0, 3), (2, 4, 6, 1, 0)), (2032, 4270))]
-        name_basic = f"00{i + 1}"[-3:]
-        name = name_basic + "_nd" + ".txt"
-        name_orig = name_basic + "_nd_original.txt"
-        with open(os.path.join(out, name), "w") as f:
-            f.write("# \n")
-
-            for node, value in h.items():
-                f.write(str(node[1] + 1) + " " + str(node[1] + 1) + " " + str(value) + "\n")
-            for edge, value in J.items():
-                f.write(str(edge[1][0] + 1) + " " + str(edge[1][1] + 1) + " " + str(value) + "\n")
-            #if wrong_edges is not None:
-            #    for edge in wrong_edges:
-            #        f.write(str(edge[0] + 1) + " " + str(edge[1] + 1) + " " + str(0) + "\n")
-
-        with open(os.path.join(out, name_orig), "w") as f:
-            f.write("# \n")
-
-            for node, value in h.items():
-                f.write(str(node[0]) + ";" + str(node[0]) + ";" + str(value) + "\n")
-            for edge, value in J.items():
-                f.write(str(edge[0][0]) + ";" + str(edge[0][1]) + ";" + str(value) + "\n")
-
-
 def generate_pegasus_instances(number: int, size: int, output_path: str, output_type: str,
                                category: str, diagonal: bool = True, device: Optional[str] = None) -> None:
 
