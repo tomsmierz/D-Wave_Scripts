@@ -4,10 +4,11 @@ import argparse
 import numpy as np
 import os
 
-from typing import Dict, Tuple, Union, Optional
+from typing import Dict, Tuple, Union, Optional, List, Callable
 from dwave.system import DWaveSampler
 from dwave.cloud import Client
 from tqdm import tqdm
+from math import inf
 
 rng = np.random.default_rng()
 path = os.getcwd()
@@ -30,47 +31,55 @@ def tuple_to_spin_glass(node: Tuple, size: int) -> int:
     return spin_glas_linear
 
 
-def find_map(source: nx.Graph, target: nx.Graph):
+def find_map(source: nx.Graph, target: nx.Graph, sampler: DWaveSampler) -> \
+        Tuple[Callable, Union[List, None], Union[List, None]]:
 
     mappings = [mapp for mapp in dnx.pegasus_sublattice_mappings(source, target)]
     mapping = None
     missing_edges = None
     missing_nodes = None
 
+    min_num_of_missing_edges = inf
+    min_num_of_missing_nodes = inf
+    best_imperfect_mapping = None
+
     for i in tqdm(range(len(mappings)), desc="Searching for a perfect mapping"):
 
-        l = {node: mappings[i](node) for node in source.nodes()}
-        nx.set_node_attributes(source, l, "mapping")
+        node_dict = {node: mappings[i](node) for node in source.nodes()}
+        edge_dict = {(v, w): (node_dict[v], node_dict[w]) for v, w in source.edges()}
 
-        em = nx.get_node_attributes(source, "mapping")
+        if all(node in target.nodes() for node in node_dict.values()) and \
+                all(edge in target.edges() for edge in edge_dict.values()):
 
-        h = {node: rng.uniform(-4, 4) for node in em.values()}
-        # print(all(node in sampler.nodelist for node in h.keys()))
-        J = {(em[edge[0]], em[edge[1]]): rng.uniform(-1, 1) for edge in source.edges()}
-        # print(all(edge in sampler.edgelist for edge in J.keys()))
-        if all(node in target.nodelist for node in h.keys()) and all(edge in target.edgelist for edge in J.keys()):
             mapping = i
+            print("\n Perfect map found")
             break
+        else:
+            mapped_source_nodes_set = set(node_dict.values())
+            mapped_source_edges_set = set([set(edge) for edge in edge_dict.values()])
+
+            real_nodes_set = set(sampler.nodelist)
+            real_edges_set = set([set(edge) for edge in sampler.edgelist])
+
+            missing_nodes = list(mapped_source_nodes_set - real_nodes_set)
+            missing_edges = list(mapped_source_edges_set - real_edges_set)
+            num_of_missing_nodes = len(missing_nodes)
+            num_of_missing_edges = len(missing_edges)
+
+            if num_of_missing_nodes <= min_num_of_missing_nodes and num_of_missing_edges <= min_num_of_missing_edges:
+                min_num_of_missing_nodes = num_of_missing_nodes
+                min_num_of_missing_edges = num_of_missing_edges
+                best_imperfect_mapping = i
 
     if mapping is None:
-        proposed = {}
-        for i in tqdm(range(len(mappings)), desc="Searching for imperfect mapping"):
+        mapping = best_imperfect_mapping
+        print(f"\n No perfect map found. Returning imperfect map with {num_of_missing_nodes} missing nodes"
+              f" and {num_of_missing_edges} missing edges")
 
-            l = {node: mappings[i](node) for node in source.nodes()}
-            nx.set_node_attributes(source, l, "mapping")
+    if mapping is None:
+        raise RuntimeError("No map found. Possible problem with the source or the target graph")
 
-            em = nx.get_node_attributes(source, "mapping")
-
-            h = {node: rng.uniform(-4, 4) for node in em.values()}
-            # print(all(node in sampler.nodelist for node in h.keys()))
-            J = {(em[edge[0]], em[edge[1]]): rng.uniform(-1, 1) for edge in source.edges()}
-            # print(all(edge in sampler.edgelist for edge in J.keys()))
-            if all(node in sampler.nodelist for node in h.keys()):
-                proposed[i] = list(set(J.keys()) - set(sampler.edgelist))
-
-        mapping = list(proposed.keys())[0]
-        edges = proposed[mapping]
-    return mapping, edges
+    return mapping, missing_nodes, missing_edges
 
 
 def generate_pegasus_map(number: int, size: int, out: str, mapping: int, sampler, wrong_edges = None, ):
