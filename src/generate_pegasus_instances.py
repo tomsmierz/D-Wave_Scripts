@@ -128,26 +128,33 @@ def generate_pegasus_instances(number: int, size: int, output_path: str, output_
             if output_type == "SpinGlass":
 
                 if not renumerated:
-                    sg_nodes = sorted([tuple_to_spin_glass(node, size) for node in source.nodes])
-                    sg_edges = sorted([(tuple_to_spin_glass(node1, size), tuple_to_spin_glass(node2, size))
-                                    for (node1, node2) in source.edges])
+                    couplings_sg = {(tuple_to_spin_glass(edge[0], size), tuple_to_spin_glass(edge[1], size)): value
+                                    for edge, value in couplings.items()}
+                    couplings_sg = dict(sorted(couplings_sg.items()))
+
+                    bias_sg = {tuple_to_spin_glass(node, size): value for node, value in bias.items()}
+                    bias_sg = dict(sorted(bias_sg.items()))
                     renumerated = True
 
                 output_name = name + "_sg.txt"
                 with open(os.path.join(output_path, output_name), "w") as f:
                     f.write("# \n")
-                    for node, value in bias.items():
+                    for node, value in bias_sg.items():
                         f.write(str(node) + " " + str(node) + " " + str(value) + "\n")
-                    for edge, value in couplings.items():
+                    for edge, value in couplings_sg.items():
                         f.write(str(edge[0]) + " " + str(edge[1]) + " " + str(value) + "\n")
 
-            if output_type == "DWave":
+            elif output_type == "DWave":
                 output_name = name + "_dv.pkl"
                 with open(os.path.join(output_path, output_name), "wb") as f:
                     data = []
 
-            if output_type == "MatrixMarket":
+            elif output_type == "MatrixMarket":
                 raise NotImplementedError("MatrixMarket output not implemented yet")
+
+            else:
+                raise ValueError(f"{output_type} is not valid output type. It should be \"SpinGlass\", \"DWave\", "
+                                 f"or \"MatrixMarket\"")
 
 
 if __name__ == "__main__":
@@ -179,7 +186,7 @@ if __name__ == "__main__":
     generate_pegasus_instances(args.number, args.size, args.path, args.types,
                                args.category, diagonal=args.diag)
 
-#generate_pegasus_instances(args.number, args.size, args.path, args.distribution)
+
 
 # mapping, edges = find_map(args.size)
 # generate_pegasus_map(args.number, args.size, args.path, mapping, edges)
