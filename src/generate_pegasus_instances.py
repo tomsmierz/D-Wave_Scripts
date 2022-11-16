@@ -112,8 +112,6 @@ def generate_pegasus_instances(number: int, size: int, output_path: str, output_
                         if source.has_edge(v, e):
                             source.remove_edge(v, e)
 
-    renumerated = False  # Flag for operation of renumeration
-
     for i in tqdm(range(number), desc="generating pegasus instances: "):
 
         if category == "RAU":
@@ -125,18 +123,17 @@ def generate_pegasus_instances(number: int, size: int, output_path: str, output_
         name = f"00{i + 1}"[-3:]
 
         for output_type in output_types:
-            if output_type == "SpinGlass":
+            if output_type == "SpinGlass":  # renumeration is very cheap, and we can afford to do this every loop
 
-                if not renumerated:
-                    couplings_sg = {(tuple_to_spin_glass(edge[0], size), tuple_to_spin_glass(edge[1], size)): value
-                                    for edge, value in couplings.items()}
-                    couplings_sg = dict(sorted(couplings_sg.items()))
+                couplings_sg = {(tuple_to_spin_glass(edge[0], size), tuple_to_spin_glass(edge[1], size)): value
+                                for edge, value in couplings.items()}
+                couplings_sg = dict(sorted(couplings_sg.items()))
 
-                    bias_sg = {tuple_to_spin_glass(node, size): value for node, value in bias.items()}
-                    bias_sg = dict(sorted(bias_sg.items()))
-                    renumerated = True
+                bias_sg = {tuple_to_spin_glass(node, size): value for node, value in bias.items()}
+                bias_sg = dict(sorted(bias_sg.items()))
 
                 output_name = name + "_sg.txt"
+
                 with open(os.path.join(output_path, output_name), "w") as f:
                     f.write("# \n")
                     for node, value in bias_sg.items():
