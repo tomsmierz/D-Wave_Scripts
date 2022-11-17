@@ -4,6 +4,7 @@ import argparse
 import numpy as np
 import os
 import pickle
+import pandas as pd
 
 from typing import Dict, Tuple, Union, Optional, List, Callable
 from dwave.system import DWaveSampler
@@ -142,9 +143,17 @@ def generate_pegasus_instances(number: int, size: int, output_path: str, output_
                         f.write(str(edge[0]) + " " + str(edge[1]) + " " + str(value) + "\n")
 
             elif output_type == "DWave":
+
+                if device is not None:
+                    couplings_dv = {(mapping(edge[0]), mapping(edge[1])): value for edge, value in couplings.items()}
+                    bias_dv = {mapping(node): value for node, value in bias.items()}
+                    data = [bias_dv, couplings_dv]
+                else:
+                    data = [bias, couplings]
+
                 output_name = name + "_dv.pkl"
                 with open(os.path.join(output_path, output_name), "wb") as f:
-                    data = []
+                    pickle.dump(data, f)
 
             elif output_type == "MatrixMarket":
                 raise NotImplementedError("MatrixMarket output not implemented yet")
