@@ -4,11 +4,9 @@ import argparse
 import numpy as np
 import os
 import pickle
-import pandas as pd
 
-from typing import Dict, Tuple, Union, Optional, List, Callable
+from typing import Tuple, Union, Optional, List, Callable
 from dwave.system import DWaveSampler
-from dwave.cloud import Client
 from tqdm import tqdm
 from math import inf
 
@@ -191,8 +189,3 @@ if __name__ == "__main__":
 
     generate_pegasus_instances(args.number, args.size, args.path, args.types,
                                args.category, diagonal=args.diag)
-
-
-
-# mapping, edges = find_map(args.size)
-# generate_pegasus_map(args.number, args.size, args.path, mapping, edges)
