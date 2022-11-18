@@ -2,6 +2,7 @@ import greedy
 import os
 import dwave.inspector
 
+import pickle
 import dwave_networkx as dnx
 import networkx as nx
 import pandas as pd
@@ -12,6 +13,7 @@ from numpy.random import default_rng
 from dwave.cloud import Client
 from tqdm import tqdm
 from typing import List
+
 
 rng = default_rng()
 cwd = os.getcwd()
@@ -24,21 +26,6 @@ max_time = 2000
 
 sampler = DWaveSampler(solver="Advantage_system6.1")
 solver = AutoEmbeddingComposite(sampler)
-
-
-def get_pegasus(path: str, name: str = "001"):
-    df = pd.read_csv(os.path.join(path, f"{name}.txt"),
-                     sep=" ", index_col=False, skiprows=1, header=None)
-    h = {}
-    J = {}
-    for index, row in df.iterrows():
-        if row[0] == row[1]:
-            h[int(row[0] - 1)] = row[2]
-            #h[int(row[0])] = row[2]
-        else:
-            J[(int(row[0] - 1), int(row[1] - 1))] = row[2]
-            #J[(int(row[0]), int(row[1]))] = row[2]
-    return h, J
 
 
 def get_pegasus_tuple(path: str, name: str = "001"):
@@ -56,28 +43,28 @@ def get_pegasus_tuple(path: str, name: str = "001"):
     return h, J
 
 
-def anneal(input_path: str, output_name: str, output_path: str = cwd,
-           num_reads: int = 5000, annealing_time: float = 20.0, random: bool = True):
-
-    with open(os.path.join(output_path, f"{output_name}_{annealing_time}.txt"), "w") as f:
-        for i in tqdm(range(100)):
-
-            if random:
-                name = f"00{i + 1}"[-3:]
-            else:
-                name = f"0{i}"[-2:]
-
-            h, J = get_pegasus(input_path, name)
-
-            sampleset = sampler.sample_ising(h, J, num_reads=num_reads, auto_scale=False,
-                                             label=f'{output_name}_{annealing_time}', annealing_time=annealing_time)
-
-            best = sampleset.first
-
-            f.write(name + ".txt" + " " + ":" + " " + f"{best[1]:.6f}" + " ")
-            for value in best[0].values():
-                f.write(str(int((value + 1) / 2)) + " ")
-            f.write("\n")
+# def anneal(input_path: str, output_name: str, output_path: str = cwd,
+#            num_reads: int = 5000, annealing_time: float = 20.0, random: bool = True):
+#
+#     with open(os.path.join(output_path, f"{output_name}_{annealing_time}.txt"), "w") as f:
+#         for i in tqdm(range(100)):
+#
+#             if random:
+#                 name = f"00{i + 1}"[-3:]
+#             else:
+#                 name = f"0{i}"[-2:]
+#
+#             h, J = get_pegasus(input_path, name)
+#
+#             sampleset = sampler.sample_ising(h, J, num_reads=num_reads, auto_scale=False,
+#                                              label=f'{output_name}_{annealing_time}', annealing_time=annealing_time)
+#
+#             best = sampleset.first
+#
+#             f.write(name + ".txt" + " " + ":" + " " + f"{best[1]:.6f}" + " ")
+#             for value in best[0].values():
+#                 f.write(str(int((value + 1) / 2)) + " ")
+#             f.write("\n")
 """
 
 graph = dnx.pegasus_graph(16, nice_coordinates=True)
@@ -154,17 +141,10 @@ with open(os.path.join(path, f"energies_P16_greedy.txt"), "w") as f:
 """
 
 if __name__ == "__main__":
-    for i in tqdm(range(10)):
-        name = f"00{i+1}"[-3:]
-        name = name + "_nd"
-        h, J = get_pegasus("/home/tsmierzchalski/instances/P8", name)
+    with open("../tests/instances/P4_dv.pkl", "rb") as f:
+       h, J = pickle.load(f)
 
-        sampleset = sampler.sample_ising(h, J, num_reads=100, label="test")
-        with open(os.path.join("/home/tsmierzchalski/instances/results_dwave", "P8_100.txt"), "a") as f:
-            f.write(name + " " + str(sampleset.first[1]) + "\n")
-    #sampleset = sampler.sample_ising(h, J, num_reads=1, label="test")
-    #dwave.inspector.show(sampleset)
-
+    print(h)
 """
     annealing_times = [min_time, default_time, long_time]  # [min_time, default_time, long_time]
     path = "/home/tsmierzchalski/pycharm_projects/D-Wave_Scripts/instances/normal/P16"
