@@ -2,44 +2,44 @@ import unittest
 import pickle
 import dwave_networkx as dnx
 import pandas as pd
-from src.generate_pegasus_instances import tuple_to_spin_glass
+from src.generate_pegasus_instances import generate_pegasus_instances, tuple_to_spin_glass
 
 
 class PegasusTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.P4 = dnx.pegasus_graph(4, nice_coordinates=True)
+        generate_pegasus_instances(number=2, size=4, output_path="instances", output_types=["SpinGlass", "DWave"],
+                                   category="RAU")
+        spin_glass = pd.read_csv("instances/001_sg.txt", sep=" ", index_col=False, skiprows=1,
+                                     names=["v", "w", "value"], header=None)
+
+        cls.h_sg = spin_glass.loc[spin_glass["v"] == spin_glass["w"]]
+        cls.J_sg = spin_glass.loc[spin_glass["v"] != spin_glass["w"]]
+        with open("instances/001_dv.pkl", "rb") as f:
+            cls.h_dv, cls.J_dv = pickle.load(f)
 
     def test_sg_instance(self):
-        df = pd.read_csv("instances/P4_sg.txt", sep=" ", index_col=False, skiprows=1,
-                         names=["v", "w", "value"], header=None)
+        self.assertEqual(self.h_sg.shape[0], len(self.P4.nodes()))
+        self.assertEqual(self.J_sg.shape[0], len(self.P4.edges()))
 
-        h = df.loc[df["v"] == df["w"]]
-        J = df.loc[df["v"] != df["w"]]
-
-        self.assertEqual(h.shape[0], len(self.P4.nodes()))
-        self.assertEqual(J.shape[0], len(self.P4.edges()))
-
-        for row in h.itertuples():
+        for row in self.h_sg.itertuples():
             self.assertTrue(-0.1 <= row.value <= 0.1)
 
-        for row in J.itertuples():
+        for row in self.J_sg.itertuples():
             self.assertTrue(-1 <= row.value <= 1)
 
     def test_dv_instance(self):
-        with open("instances/P4_dv.pkl", "rb") as f:
-            h, J = pickle.load(f)
+        self.assertIsInstance(self.h_dv, dict)
+        self.assertIsInstance(self.J_dv, dict)
+        self.assertEqual(len(self.h_dv), len(self.P4.nodes()))
+        self.assertEqual(len(self.J_dv), len(self.P4.edges()))
 
-        self.assertIsInstance(h, dict)
-        self.assertIsInstance(J, dict)
-        self.assertEqual(len(h), len(self.P4.nodes()))
-        self.assertEqual(len(J), len(self.P4.edges()))
-
-        for node, value in h.items():
+        for node, value in self.h_dv.items():
             self.assertIn(node, self.P4.nodes())
             self.assertTrue(-0.1 <= value <= 0.1)
 
-        for edge, value in J.items():
+        for edge, value in self.J_dv.items():
             self.assertIn(edge, self.P4.edges())
             self.assertTrue(-1 <= value <= 1)
 
@@ -47,26 +47,22 @@ class PegasusTest(unittest.TestCase):
         pass
 
     def test_same_instances(self):
-        df = pd.read_csv("instances/P4_sg.txt", sep=" ", index_col=False, skiprows=1,
-                         names=["v", "w", "value"], header=None)
-        h_sg = df.loc[df["v"] == df["w"]]
-        J_sg = df.loc[df["v"] != df["w"]]
+        for node, value in self.h_dv.items():
+            index = self.h_sg.loc[self.h_sg["v"] == tuple_to_spin_glass(node, 4)].index[0]
+            self.assertAlmostEqual(value, self.h_sg.at[index, "value"], 15)
 
-        with open("instances/P4_dv.pkl", "rb") as f:
-            h_dv, J_dv = pickle.load(f)
-
-        for node, value in h_dv.items():
-            index = h_sg.loc[h_sg["v"] == tuple_to_spin_glass(node, 4)].index[0]
-            self.assertAlmostEqual(value, h_sg.at[index, "value"], 15)
-
-        for edge, value in J_dv.items():
-            index = J_sg.loc[J_sg["v"] == tuple_to_spin_glass(edge[0], 4)]
+        for edge, value in self.J_dv.items():
+            index = self.J_sg.loc[self.J_sg["v"] == tuple_to_spin_glass(edge[0], 4)]
             index = index.loc[index["w"] == tuple_to_spin_glass(edge[1], 4)].index[0]
-            self.assertAlmostEqual(value, J_sg.at[index, "value"], 15)
-
+            self.assertAlmostEqual(value, self.J_sg.at[index, "value"], 15)
 
     def test_different_instances(self):
-        pass
+        with open("instances/002_dv.pkl", "rb") as f:
+            h, J = pickle.load(f)
+
+        self.assertNotEqual(h, self.h_dv)
+        self.assertNotEqual(J, self.J_dv)
+
 
 
 if __name__ == '__main__':
