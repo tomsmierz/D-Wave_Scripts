@@ -188,4 +188,4 @@ if __name__ == "__main__":
         parser.error("Minimum size of pegasus instance is 2")
 
     generate_pegasus_instances(args.number, args.size, args.path, args.types,
-                               args.category, diagonal=args.diag)
+                               args.category, diagonal=args.diag, device=args.device)

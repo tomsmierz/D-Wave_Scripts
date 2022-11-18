@@ -64,6 +64,5 @@ class PegasusTest(unittest.TestCase):
         self.assertNotEqual(J, self.J_dv)
 
 
-
 if __name__ == '__main__':
     unittest.main()
