@@ -82,7 +82,8 @@ def find_map(source: nx.Graph, target: nx.Graph, sampler: DWaveSampler) -> \
 
 
 def generate_pegasus_instances(number: int, size: int, output_path: str, output_types: List[str],
-                               category: str, diagonal: bool = True, device: Optional[str] = None) -> None:
+                               category: str, diagonal: bool = True, device: Optional[str] = None,
+                               name: Optional[str] = None) -> None:
 
     source = dnx.pegasus_graph(size, nice_coordinates=True)
 
@@ -118,8 +119,8 @@ def generate_pegasus_instances(number: int, size: int, output_path: str, output_
             bias = {node: rng.uniform(-0.1, 0.1) for node in source.nodes()}
         else:
             raise NotImplementedError("Categories other than RAU not implemented yet")
-
-        name = f"00{i + 1}"[-3:]
+        if name is None:
+            name = f"00{i + 1}"[-3:]
 
         for output_type in output_types:
             if output_type == "SpinGlass":  # renumeration is very cheap, and we can afford to do this every loop
