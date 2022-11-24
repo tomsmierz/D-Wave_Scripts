@@ -2,6 +2,7 @@ import unittest
 import pickle
 import dwave_networkx as dnx
 import pandas as pd
+from dwave.system import DWaveSampler
 from src.generate_pegasus_instances import generate_pegasus_instances, tuple_to_spin_glass
 
 
@@ -9,8 +10,11 @@ class PegasusTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.P4 = dnx.pegasus_graph(4, nice_coordinates=True)
+        cls.device = "Advantage_system6.1"
         generate_pegasus_instances(number=2, size=4, output_path="instances", output_types=["SpinGlass", "DWave"],
                                    category="RAU")
+        generate_pegasus_instances(number=1, size=4, output_path="instances", output_types=["DWave"], category="RAU",
+                                   device=cls.device, name="qpu")
         spin_glass = pd.read_csv("instances/001_sg.txt", sep=" ", index_col=False, skiprows=1,
                                      names=["v", "w", "value"], header=None)
 
@@ -44,7 +48,10 @@ class PegasusTest(unittest.TestCase):
             self.assertTrue(-1 <= value <= 1)
 
     def test_device_instance(self):
-        pass
+        with open("instances/qpu_dv.pkl", "rb") as f:
+            linear, quadratic = pickle.load(f)
+        sampler = DWaveSampler(solver=self.device)
+        self.assertTrue(sampler.solver.check_problem(linear, quadratic))
 
     def test_same_instances(self):
         for node, value in self.h_dv.items():
