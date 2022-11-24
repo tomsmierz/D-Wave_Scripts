@@ -18,6 +18,10 @@ def rn(s: int) -> Tuple:
     return dnx.pegasus_coordinates(16).linear_to_nice(s)
 
 
+def nice_to_linear(t: Tuple) -> int:
+    return dnx.pegasus_coordinates(16).nice_to_linear(t)
+
+
 def tuple_to_spin_glass(node: Tuple, size: int) -> int:
     t, y, x, u, k = node
     if u == 1:
@@ -30,9 +34,9 @@ def tuple_to_spin_glass(node: Tuple, size: int) -> int:
     return spin_glas_linear
 
 
-def find_map(source: nx.Graph, target: nx.Graph, sampler: DWaveSampler) -> \
+def find_map(source: nx.Graph, sampler: DWaveSampler) -> \
         Tuple[Callable, Union[List, None], Union[List, None]]:
-
+    target = sampler.to_networkx_graph()
     mappings = [mapp for mapp in dnx.pegasus_sublattice_mappings(source, target)]
     mapping = None
     missing_edges = None
@@ -50,15 +54,15 @@ def find_map(source: nx.Graph, target: nx.Graph, sampler: DWaveSampler) -> \
         if all(node in target.nodes() for node in node_dict.values()) and \
                 all(edge in target.edges() for edge in edge_dict.values()):
 
-            mapping = i
+            mapping = mappings[i]
             print("\n Perfect map found")
             break
         else:
             mapped_source_nodes_set = set(node_dict.values())
-            mapped_source_edges_set = set([set(edge) for edge in edge_dict.values()])
+            mapped_source_edges_set = set([frozenset(edge) for edge in edge_dict.values()])
 
             real_nodes_set = set(sampler.nodelist)
-            real_edges_set = set([set(edge) for edge in sampler.edgelist])
+            real_edges_set = set([frozenset(edge) for edge in sampler.edgelist])
 
             missing_nodes = list(mapped_source_nodes_set - real_nodes_set)
             missing_edges = list(mapped_source_edges_set - real_edges_set)
@@ -68,7 +72,7 @@ def find_map(source: nx.Graph, target: nx.Graph, sampler: DWaveSampler) -> \
             if num_of_missing_nodes <= min_num_of_missing_nodes and num_of_missing_edges <= min_num_of_missing_edges:
                 min_num_of_missing_nodes = num_of_missing_nodes
                 min_num_of_missing_edges = num_of_missing_edges
-                best_imperfect_mapping = i
+                best_imperfect_mapping = mappings[i]
 
     if mapping is None:
         mapping = best_imperfect_mapping
@@ -92,8 +96,7 @@ def generate_pegasus_instances(number: int, size: int, output_path: str, output_
             raise AssertionError("Device should be set to \"Advantage_system4.1\", \"Advantage_system5.2\", "
                                  "\"Advantage_system6.1\" or None")
         sampler = DWaveSampler(solver=device)
-        target = dnx.pegasus_graph(16, nice_coordinates=True)
-        mapping, missing_nodes, missing_edges = find_map(source, target, sampler)
+        mapping, missing_nodes, missing_edges = find_map(source, sampler)
 
     if not diagonal:
         for y in range(size - 1):
@@ -144,6 +147,7 @@ def generate_pegasus_instances(number: int, size: int, output_path: str, output_
             elif output_type == "DWave":
 
                 if device is not None:
+                    
                     couplings_dv = {(mapping(edge[0]), mapping(edge[1])): value for edge, value in couplings.items()}
                     bias_dv = {mapping(node): value for node, value in bias.items()}
                     data = [bias_dv, couplings_dv]
