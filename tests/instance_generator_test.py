@@ -73,7 +73,7 @@ class PegasusTest(unittest.TestCase):
                 self.assertTrue(-1 <= value <= 1)
 
     def test_device_instance(self):
-        with open("instances/qpu_dv.pkl", "rb") as f:
+        with open("instances/qpu1_dv.pkl", "rb") as f:
             linear, quadratic = pickle.load(f)
         sampler = DWaveSampler(solver=DEVICE)
         self.assertTrue(sampler.solver.check_problem(linear, quadratic))

@@ -103,6 +103,7 @@ def generate_pegasus_instances(number: int, size: int, output_path: str, output_
                                name: Optional[str] = None) -> None:
 
     source = dnx.pegasus_graph(size, nice_coordinates=True)
+    username = True if name is not None else False
 
     if device is not None:
         if device not in ["Advantage_system4.1", "Advantage_system5.2", "Advantage_system6.1"]:
@@ -151,7 +152,7 @@ def generate_pegasus_instances(number: int, size: int, output_path: str, output_
                         if source.has_edge(v, e):
                             source.remove_edge(v, e)
 
-    for i in tqdm(range(number), desc="generating pegasus instances: "):
+    for i in tqdm(range(number), desc=f"generating pegasus instances size = {size}, category={category}: "):
 
         if category == "RAU":
             bias = {node: rng.uniform(-0.1, 0.1) for node in graph.nodes()}
@@ -166,7 +167,9 @@ def generate_pegasus_instances(number: int, size: int, output_path: str, output_
         else:
             raise NotImplementedError("Categories other than RAU not implemented yet")
 
-        if name is None:
+        if username:
+            name = name + f"{i + 1}"
+        else:
             name = f"00{i + 1}"[-3:]
 
         for output_type in output_types:
@@ -191,6 +194,7 @@ def generate_pegasus_instances(number: int, size: int, output_path: str, output_
             elif output_type == "DWave":
 
                 if device is not None:
+                    
                     couplings_dv = {(mapping(edge[0]), mapping(edge[1])): value for edge, value in couplings.items()}
                     bias_dv = {mapping(node): value for node, value in bias.items()}
                     data = [bias_dv, couplings_dv]
@@ -226,7 +230,7 @@ if __name__ == "__main__":
                         choices=["SpinGlass", "DWave", "MatrixMarket"], nargs="*")
     parser.add_argument("--diag", type=bool, default=True,
                         help="Generate pegasus instances with or without \"diagonal\" connections")
-    parser.add_argument("-D", "--device", type=Union[str, None], default=None,
+    parser.add_argument("-D", "--device", default=None,
                         choices=["Advantage_system4.1", "Advantage_system5.2", "Advantage_system6.1", None],
                         help="Map instance info physical D-Wave's device. Input None for no Mapping")
 
