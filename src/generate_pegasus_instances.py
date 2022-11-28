@@ -14,11 +14,15 @@ rng = np.random.default_rng()
 path = os.getcwd()
 
 
-def rn(s: int) -> Tuple:
+def linear_to_nice(s: int) -> Tuple:
     return dnx.pegasus_coordinates(16).linear_to_nice(s)
 
 
-def tuple_to_spin_glass(node: Tuple, size: int) -> int:
+def nice_to_linear(t: Tuple) -> int:
+    return dnx.pegasus_coordinates(16).nice_to_linear(t)
+
+
+def nice_to_spin_glass(node: Tuple, size: int) -> int:
     t, y, x, u, k = node
     if u == 1:
         a = 4 + k + 1
@@ -30,13 +34,23 @@ def tuple_to_spin_glass(node: Tuple, size: int) -> int:
     return spin_glas_linear
 
 
-def find_map(source: nx.Graph, target: nx.Graph, sampler: DWaveSampler) -> \
-        Tuple[Callable, Union[List, None], Union[List, None]]:
+def reverse_pegasus_sublattice_mapping(mapping: Callable, source: nx.Graph) -> Callable:
+    node_dict = {node: mapping(node) for node in source.nodes}
+    reversed_dict = {value: key for key, value in node_dict.items()}
 
+    def func(node: int) -> Tuple:
+        return reversed_dict[node]
+
+    return func
+
+
+def find_map(source: nx.Graph, sampler: DWaveSampler) -> Tuple:
+    target = sampler.to_networkx_graph()
+    perfect = False
     mappings = [mapp for mapp in dnx.pegasus_sublattice_mappings(source, target)]
     mapping = None
-    missing_edges = None
-    missing_nodes = None
+    best_missing_nodes = None
+    best_missing_edges = None
 
     min_num_of_missing_edges = inf
     min_num_of_missing_nodes = inf
@@ -50,15 +64,16 @@ def find_map(source: nx.Graph, target: nx.Graph, sampler: DWaveSampler) -> \
         if all(node in target.nodes() for node in node_dict.values()) and \
                 all(edge in target.edges() for edge in edge_dict.values()):
 
-            mapping = i
-            print("\n Perfect map found")
+            mapping = mappings[i]
+            print("\nPerfect map found")
+            perfect = True
             break
         else:
             mapped_source_nodes_set = set(node_dict.values())
-            mapped_source_edges_set = set([set(edge) for edge in edge_dict.values()])
+            mapped_source_edges_set = set([frozenset(edge) for edge in edge_dict.values()])
 
             real_nodes_set = set(sampler.nodelist)
-            real_edges_set = set([set(edge) for edge in sampler.edgelist])
+            real_edges_set = set([frozenset(edge) for edge in sampler.edgelist])
 
             missing_nodes = list(mapped_source_nodes_set - real_nodes_set)
             missing_edges = list(mapped_source_edges_set - real_edges_set)
@@ -68,21 +83,24 @@ def find_map(source: nx.Graph, target: nx.Graph, sampler: DWaveSampler) -> \
             if num_of_missing_nodes <= min_num_of_missing_nodes and num_of_missing_edges <= min_num_of_missing_edges:
                 min_num_of_missing_nodes = num_of_missing_nodes
                 min_num_of_missing_edges = num_of_missing_edges
-                best_imperfect_mapping = i
+                best_missing_nodes = missing_nodes
+                best_missing_edges = missing_edges
+                best_imperfect_mapping = mappings[i]
 
     if mapping is None:
         mapping = best_imperfect_mapping
-        print(f"\n No perfect map found. Returning imperfect map with {num_of_missing_nodes} missing nodes"
-              f" and {num_of_missing_edges} missing edges")
+        print(f"\nNo perfect map found. Returning imperfect map with {min_num_of_missing_nodes} missing nodes"
+              f" and {min_num_of_missing_edges} missing edges")
 
     if mapping is None:
         raise RuntimeError("No map found. Possible problem with the source or the target graph")
 
-    return mapping, missing_nodes, missing_edges
+    return mapping, perfect, best_missing_nodes, best_missing_edges
 
 
 def generate_pegasus_instances(number: int, size: int, output_path: str, output_types: List[str],
-                               category: str, diagonal: bool = True, device: Optional[str] = None) -> None:
+                               category: str, diagonal: bool = True, device: Optional[str] = None,
+                               name: Optional[str] = None) -> None:
 
     source = dnx.pegasus_graph(size, nice_coordinates=True)
 
@@ -90,9 +108,31 @@ def generate_pegasus_instances(number: int, size: int, output_path: str, output_
         if device not in ["Advantage_system4.1", "Advantage_system5.2", "Advantage_system6.1"]:
             raise AssertionError("Device should be set to \"Advantage_system4.1\", \"Advantage_system5.2\", "
                                  "\"Advantage_system6.1\" or None")
+        if size > 16:
+            raise AssertionError("Maximum size for working device is 16")
+
         sampler = DWaveSampler(solver=device)
-        target = dnx.pegasus_graph(16, nice_coordinates=True)
-        mapping, missing_nodes, missing_edges = find_map(source, target, sampler)
+        mapping, perfect_mapping, missing_nodes, missing_edges = find_map(source, sampler)
+        if perfect_mapping:
+            graph = source
+        else:
+            reverse_mapping = reverse_pegasus_sublattice_mapping(mapping, source)
+            graph = source
+            for node in missing_nodes:
+                graph.remove_node(reverse_mapping(node))
+
+            for edge in missing_edges:
+                edge = tuple(edge)
+                edge = (reverse_mapping(edge[0]), reverse_mapping(edge[1]))
+                reversed_edge = (edge[1], edge[0])
+                if edge in graph.edges():
+                    graph.remove_edge(edge[0], edge[1])
+
+                if reversed_edge in graph.edges():
+                    graph.remove_edge(reversed_edge[0], reversed_edge[1])
+
+    else:
+        graph = source
 
     if not diagonal:
         for y in range(size - 1):
@@ -114,21 +154,29 @@ def generate_pegasus_instances(number: int, size: int, output_path: str, output_
     for i in tqdm(range(number), desc="generating pegasus instances: "):
 
         if category == "RAU":
-            couplings = {edge: rng.uniform(-1, 1) for edge in source.edges()}
-            bias = {node: rng.uniform(-0.1, 0.1) for node in source.nodes()}
+            bias = {node: rng.uniform(-0.1, 0.1) for node in graph.nodes()}
+            couplings = {edge: rng.uniform(-1, 1) for edge in graph.edges()}
+        elif category == "RCO":
+            bias = {node: 0 for node in graph.nodes()}
+            couplings = {edge: rng.uniform(-1, 1) for edge in graph.edges()}
+        elif category == "AC3":
+            bias = {node: rng.uniform(-1/9, 1/9) for node in graph.nodes()}
+            couplings = {edge: rng.uniform(-1/3, 1/3) if edge[0][1:3] == edge[1][1:3]
+                         else rng.uniform(-1, 1) for edge in graph.edges()}
         else:
             raise NotImplementedError("Categories other than RAU not implemented yet")
 
-        name = f"00{i + 1}"[-3:]
+        if name is None:
+            name = f"00{i + 1}"[-3:]
 
         for output_type in output_types:
             if output_type == "SpinGlass":  # renumeration is very cheap, and we can afford to do this every loop
 
-                couplings_sg = {(tuple_to_spin_glass(edge[0], size), tuple_to_spin_glass(edge[1], size)): value
+                couplings_sg = {(nice_to_spin_glass(edge[0], size), nice_to_spin_glass(edge[1], size)): value
                                 for edge, value in couplings.items()}
                 couplings_sg = dict(sorted(couplings_sg.items()))
 
-                bias_sg = {tuple_to_spin_glass(node, size): value for node, value in bias.items()}
+                bias_sg = {nice_to_spin_glass(node, size): value for node, value in bias.items()}
                 bias_sg = dict(sorted(bias_sg.items()))
 
                 output_name = name + "_sg.txt"
@@ -168,13 +216,13 @@ if __name__ == "__main__":
                         help="Size of the pegasus graph. Minimum 2. Default is 4 (P4).")
     parser.add_argument("-N", "--number", type=int, default=1,
                         help="Number of instances to be generated. Default is 1.")
-    parser.add_argument("-C", "--category", type=str, default="RAU", choices=["RAU", "RAC", "AC3"],
-                        help="Category of generated instances. RAU - random uniform, RAC - random couplings only, "
+    parser.add_argument("-C", "--category", type=str, default="RAU", choices=["RAU", "RCO", "AC3"],
+                        help="Category of generated instances. RAU - random uniform, RCO - random couplings only, "
                              "AC3 - anti-cluster")
     parser.add_argument("-P", "--path", type=str, default=path,
                         help="path to folder where generated instances will be located. "
                              "Default is working directory")
-    parser.add_argument("-T", "--types", type=str, default="SpinGlass",
+    parser.add_argument("-T", "--types", type=str, default=["SpinGlass"],
                         choices=["SpinGlass", "DWave", "MatrixMarket"], nargs="*")
     parser.add_argument("--diag", type=bool, default=True,
                         help="Generate pegasus instances with or without \"diagonal\" connections")
@@ -188,4 +236,4 @@ if __name__ == "__main__":
         parser.error("Minimum size of pegasus instance is 2")
 
     generate_pegasus_instances(args.number, args.size, args.path, args.types,
-                               args.category, diagonal=args.diag)
+                               args.category, diagonal=args.diag, device=args.device)
