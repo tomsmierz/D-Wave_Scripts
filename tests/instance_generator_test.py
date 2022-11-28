@@ -3,7 +3,7 @@ import pickle
 import dwave_networkx as dnx
 import pandas as pd
 from dwave.system import DWaveSampler
-from src.generate_pegasus_instances import generate_pegasus_instances, tuple_to_spin_glass
+from src.generate_pegasus_instances import generate_pegasus_instances, nice_to_spin_glass
 
 
 class PegasusTest(unittest.TestCase):
@@ -55,12 +55,12 @@ class PegasusTest(unittest.TestCase):
 
     def test_same_instances(self):
         for node, value in self.h_dv.items():
-            index = self.h_sg.loc[self.h_sg["v"] == tuple_to_spin_glass(node, 4)].index[0]
+            index = self.h_sg.loc[self.h_sg["v"] == nice_to_spin_glass(node, 4)].index[0]
             self.assertAlmostEqual(value, self.h_sg.at[index, "value"], 15)
 
         for edge, value in self.J_dv.items():
-            index = self.J_sg.loc[self.J_sg["v"] == tuple_to_spin_glass(edge[0], 4)]
-            index = index.loc[index["w"] == tuple_to_spin_glass(edge[1], 4)].index[0]
+            index = self.J_sg.loc[self.J_sg["v"] == nice_to_spin_glass(edge[0], 4)]
+            index = index.loc[index["w"] == nice_to_spin_glass(edge[1], 4)].index[0]
             self.assertAlmostEqual(value, self.J_sg.at[index, "value"], 15)
 
     def test_different_instances(self):
