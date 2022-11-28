@@ -162,8 +162,9 @@ def generate_pegasus_instances(number: int, size: int, output_path: str, output_
             bias = {node: 0 for node in graph.nodes()}
             couplings = {edge: rng.uniform(-1, 1) for edge in graph.edges()}
         elif category == "AC3":
-            bias = {node: 0 for node in graph.nodes()}
-            couplings = {edge: rng.uniform(-1, 1) for edge in graph.edges()}
+            bias = {node: rng.uniform(-1/9, 1/9) for node in graph.nodes()}
+            couplings = {edge: rng.uniform(-1/3, 1/3) if edge[0][1:3] == edge[1][1:3]
+                         else rng.uniform(-1, 1) for edge in graph.edges()}
         else:
             raise NotImplementedError("Categories other than RAU not implemented yet")
 

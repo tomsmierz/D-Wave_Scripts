@@ -5,18 +5,21 @@ import pandas as pd
 from dwave.system import DWaveSampler
 from src.generate_pegasus_instances import generate_pegasus_instances, nice_to_spin_glass
 
+CATEGORY = "AC3"
+DEVICE = "Advantage_system6.1"
+SIZE = 4
+
 
 class PegasusTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.P4 = dnx.pegasus_graph(4, nice_coordinates=True)
-        cls.device = "Advantage_system6.1"
-        generate_pegasus_instances(number=2, size=4, output_path="instances", output_types=["SpinGlass", "DWave"],
-                                   category="RAU")
-        generate_pegasus_instances(number=1, size=4, output_path="instances", output_types=["DWave"], category="RAU",
-                                   device=cls.device, name="qpu")
+        cls.pegasus = dnx.pegasus_graph(SIZE, nice_coordinates=True)
+        generate_pegasus_instances(number=2, size=SIZE, output_path="instances", output_types=["SpinGlass", "DWave"],
+                                   category=CATEGORY)
+        generate_pegasus_instances(number=1, size=SIZE, output_path="instances", output_types=["DWave"],
+                                   category=CATEGORY, device=DEVICE, name="qpu")
         spin_glass = pd.read_csv("instances/001_sg.txt", sep=" ", index_col=False, skiprows=1,
-                                     names=["v", "w", "value"], header=None)
+                                 names=["v", "w", "value"], header=None)
 
         cls.h_sg = spin_glass.loc[spin_glass["v"] == spin_glass["w"]]
         cls.J_sg = spin_glass.loc[spin_glass["v"] != spin_glass["w"]]
@@ -24,43 +27,65 @@ class PegasusTest(unittest.TestCase):
             cls.h_dv, cls.J_dv = pickle.load(f)
 
     def test_sg_instance(self):
-        self.assertEqual(self.h_sg.shape[0], len(self.P4.nodes()))
-        self.assertEqual(self.J_sg.shape[0], len(self.P4.edges()))
+        self.assertEqual(self.h_sg.shape[0], len(self.pegasus.nodes()))
+        self.assertEqual(self.J_sg.shape[0], len(self.pegasus.edges()))
 
-        for row in self.h_sg.itertuples():
-            self.assertTrue(-0.1 <= row.value <= 0.1)
+        if CATEGORY == "RAU":
+            for row in self.h_sg.itertuples():
+                self.assertTrue(-0.1 <= row.value <= 0.1)
 
-        for row in self.J_sg.itertuples():
-            self.assertTrue(-1 <= row.value <= 1)
+            for row in self.J_sg.itertuples():
+                self.assertTrue(-1 <= row.value <= 1)
+        elif CATEGORY == "RCO":
+            for row in self.h_sg.itertuples():
+                self.assertTrue(row.value == 0)
+
+            for row in self.J_sg.itertuples():
+                self.assertTrue(-1 <= row.value <= 1)
+        else:  # AC3
+            for row in self.h_sg.itertuples():
+                self.assertTrue(-1/9 <= row.value <= 1/9)
 
     def test_dv_instance(self):
         self.assertIsInstance(self.h_dv, dict)
         self.assertIsInstance(self.J_dv, dict)
-        self.assertEqual(len(self.h_dv), len(self.P4.nodes()))
-        self.assertEqual(len(self.J_dv), len(self.P4.edges()))
+        self.assertEqual(len(self.h_dv), len(self.pegasus.nodes()))
+        self.assertEqual(len(self.J_dv), len(self.pegasus.edges()))
 
         for node, value in self.h_dv.items():
-            self.assertIn(node, self.P4.nodes())
-            self.assertTrue(-0.1 <= value <= 0.1)
+            self.assertIn(node, self.pegasus.nodes())
+            if CATEGORY == "RAU":
+                self.assertTrue(-0.1 <= value <= 0.1)
+            elif CATEGORY == "RCO":
+                self.assertTrue(value == 0)
+            else:
+                self.assertTrue(-1/9 <= value <= 1/9)
 
         for edge, value in self.J_dv.items():
-            self.assertIn(edge, self.P4.edges())
-            self.assertTrue(-1 <= value <= 1)
+            self.assertIn(edge, self.pegasus.edges())
+            if CATEGORY == "RAU":
+                self.assertTrue(-1 <= value <= 1)
+            elif CATEGORY == "RCO":
+                self.assertTrue(-1 <= value <= 1)
+            elif edge[0][1:3] == edge[1][1:3]:
+                self.assertTrue(-1/3 <= value <= 1/3)
+            else:
+                self.assertTrue(-1 <= value <= 1)
 
     def test_device_instance(self):
         with open("instances/qpu_dv.pkl", "rb") as f:
             linear, quadratic = pickle.load(f)
-        sampler = DWaveSampler(solver=self.device)
+        sampler = DWaveSampler(solver=DEVICE)
         self.assertTrue(sampler.solver.check_problem(linear, quadratic))
 
     def test_same_instances(self):
         for node, value in self.h_dv.items():
-            index = self.h_sg.loc[self.h_sg["v"] == nice_to_spin_glass(node, 4)].index[0]
+            index = self.h_sg.loc[self.h_sg["v"] == nice_to_spin_glass(node, SIZE)].index[0]
             self.assertAlmostEqual(value, self.h_sg.at[index, "value"], 15)
 
         for edge, value in self.J_dv.items():
-            index = self.J_sg.loc[self.J_sg["v"] == nice_to_spin_glass(edge[0], 4)]
-            index = index.loc[index["w"] == nice_to_spin_glass(edge[1], 4)].index[0]
+            index = self.J_sg.loc[self.J_sg["v"] == nice_to_spin_glass(edge[0], SIZE)]
+            index = index.loc[index["w"] == nice_to_spin_glass(edge[1], SIZE)].index[0]
             self.assertAlmostEqual(value, self.J_sg.at[index, "value"], 15)
 
     def test_different_instances(self):
