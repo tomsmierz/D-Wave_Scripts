@@ -5,7 +5,7 @@ import numpy as np
 import os
 import pickle
 
-from typing import Tuple, Union, Optional, List, Callable, Dict
+from typing import Tuple, Union, Optional, List, Callable
 from dwave.system import DWaveSampler
 from tqdm import tqdm
 from math import inf
@@ -49,8 +49,6 @@ def find_map(source: nx.Graph, sampler: DWaveSampler) -> Tuple:
     perfect = False
     mappings = [mapp for mapp in dnx.pegasus_sublattice_mappings(source, target)]
     mapping = None
-    missing_edges = None
-    missing_nodes = None
     best_missing_nodes = None
     best_missing_edges = None
 
