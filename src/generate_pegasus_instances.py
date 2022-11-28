@@ -5,7 +5,7 @@ import numpy as np
 import os
 import pickle
 
-from typing import Tuple, Union, Optional, List, Callable
+from typing import Tuple, Union, Optional, List, Callable, Dict
 from dwave.system import DWaveSampler
 from tqdm import tqdm
 from math import inf
@@ -34,14 +34,25 @@ def nice_to_spin_glass(node: Tuple, size: int) -> int:
     return spin_glas_linear
 
 
-def find_map(source: nx.Graph, sampler: DWaveSampler) -> \
-        Tuple[Callable, bool, List, Union[List, None], Union[List, None]]:
+def reverse_pegasus_sublattice_mapping(mapping: Callable, source: nx.Graph) -> Callable:
+    node_dict = {node: mapping(node) for node in source.nodes}
+    reversed_dict = {value: key for key, value in node_dict.items()}
+
+    def func(node: int) -> Tuple:
+        return reversed_dict[node]
+
+    return func
+
+
+def find_map(source: nx.Graph, sampler: DWaveSampler) -> Tuple:
     target = sampler.to_networkx_graph()
     perfect = False
     mappings = [mapp for mapp in dnx.pegasus_sublattice_mappings(source, target)]
     mapping = None
     missing_edges = None
     missing_nodes = None
+    best_missing_nodes = None
+    best_missing_edges = None
 
     min_num_of_missing_edges = inf
     min_num_of_missing_nodes = inf
@@ -56,7 +67,7 @@ def find_map(source: nx.Graph, sampler: DWaveSampler) -> \
                 all(edge in target.edges() for edge in edge_dict.values()):
 
             mapping = mappings[i]
-            print("\n Perfect map found")
+            print("\nPerfect map found")
             perfect = True
             break
         else:
@@ -74,18 +85,19 @@ def find_map(source: nx.Graph, sampler: DWaveSampler) -> \
             if num_of_missing_nodes <= min_num_of_missing_nodes and num_of_missing_edges <= min_num_of_missing_edges:
                 min_num_of_missing_nodes = num_of_missing_nodes
                 min_num_of_missing_edges = num_of_missing_edges
+                best_missing_nodes = missing_nodes
+                best_missing_edges = missing_edges
                 best_imperfect_mapping = mappings[i]
 
     if mapping is None:
         mapping = best_imperfect_mapping
-        print(f"\n No perfect map found. Returning imperfect map with {num_of_missing_nodes} missing nodes"
-              f" and {num_of_missing_edges} missing edges")
+        print(f"\nNo perfect map found. Returning imperfect map with {min_num_of_missing_nodes} missing nodes"
+              f" and {min_num_of_missing_edges} missing edges")
 
     if mapping is None:
         raise RuntimeError("No map found. Possible problem with the source or the target graph")
 
-    offset = mapping.offset
-    return mapping, perfect, offset, missing_nodes, missing_edges
+    return mapping, perfect, best_missing_nodes, best_missing_edges
 
 
 def generate_pegasus_instances(number: int, size: int, output_path: str, output_types: List[str],
@@ -102,14 +114,25 @@ def generate_pegasus_instances(number: int, size: int, output_path: str, output_
             raise AssertionError("Maximum size for working device is 16")
 
         sampler = DWaveSampler(solver=device)
-        mapping, perfect_mapping, offset, missing_nodes, missing_edges = find_map(source, sampler)
+        mapping, perfect_mapping, missing_nodes, missing_edges = find_map(source, sampler)
         if perfect_mapping:
             graph = source
-            print(dnx.pegasus_coordinates(16).linear_to_nice(missing_nodes[0]))
-            print(missing_edges)
-            print(offset)
         else:
-            pass
+            reverse_mapping = reverse_pegasus_sublattice_mapping(mapping, source)
+            graph = source
+            for node in missing_nodes:
+                graph.remove_node(reverse_mapping(node))
+
+            for edge in missing_edges:
+                edge = tuple(edge)
+                edge = (reverse_mapping(edge[0]), reverse_mapping(edge[1]))
+                reversed_edge = (edge[1], edge[0])
+                if edge in graph.edges():
+                    graph.remove_edge(edge[0], edge[1])
+
+                if reversed_edge in graph.edges():
+                    graph.remove_edge(reversed_edge[0], reversed_edge[1])
+
     else:
         graph = source
 
