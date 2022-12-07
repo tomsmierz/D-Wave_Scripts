@@ -178,4 +178,26 @@ def generate_zephyr_instances(number: int, size: int, output_path: str, output_t
 
 if __name__ == "__main__":
 
-    pass
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-S", "--size", type=int, default=2,
+                        help="Size of the zephyr graph. Minimum 1. Default is 2 (Z2).")
+    parser.add_argument("-N", "--number", type=int, default=1,
+                        help="Number of instances to be generated. Default is 1.")
+    parser.add_argument("-C", "--category", type=str, default="RAU", choices=["RAU", "RCO"],
+                        help="Category of generated instances. RAU - random uniform, RCO - random couplings only, "
+                             "AC3 - anti-cluster. AC3 not implemented yet")
+    parser.add_argument("-P", "--path", type=str, default=path,
+                        help="path to folder where generated instances will be located. "
+                             "Default is working directory")
+    parser.add_argument("-T", "--types", type=str, default=["SpinGlass"],
+                        choices=["SpinGlass", "DWave", "MatrixMarket"], nargs="*")
+    parser.add_argument("-D", "--device", default=None,
+                        choices=["Advantage2_prototype1.1", None],
+                        help="Map instance info physical D-Wave's device. Input None for no Mapping")
+
+    args = parser.parse_args()
+
+    if args.size and args.size < 1:
+        parser.error("Minimum size of zephyr instance is 1")
+
+    generate_zephyr_instances(args.number, args.size, args.path, args.types, args.category, device=args.device)
