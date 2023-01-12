@@ -15,7 +15,7 @@ sampler = DWaveSampler(solver="Advantage2_prototype1.1")  # DWaveSampler(solver=
 
 
 instance_number = "001"
-size = 3
+size = 1
 for category in ["RAU"]:  # ["AC3", "RCO", "RAU"]:
     with open(f"../instances/{topology}_random/{symbol}{size}/{category}/{instance_number}_dv.pkl", "rb") as f:
         h, J = pickle.load(f)
@@ -24,6 +24,7 @@ for category in ["RAU"]:  # ["AC3", "RCO", "RAU"]:
         num_reads = 300 if annealing_time == 2000 else 1000
         sample_set = sampler.sample_ising(h, J, annealing_time=annealing_time, num_reads=num_reads, auto_scale=False,
                                           label=f"{topology} {symbol}{size} {instance_number} {category} {annealing_time}")
+        print(sample_set.info)
         df = sample_set.to_pandas_dataframe()
         df.to_csv(f"../energies/{topology}_random/{symbol}{size}/{category}/{instance_number}_{annealing_time}_{num_reads}.csv")
 
