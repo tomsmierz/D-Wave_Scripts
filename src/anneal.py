@@ -14,8 +14,8 @@ symbol = "Z"
 sampler = DWaveSampler(solver="Advantage2_prototype1.1")  # DWaveSampler(solver="Advantage_system6.1")
 
 
-instance_number = "001"
-size = 1
+instance_number = "002"
+size = 3
 for category in ["RAU"]:  # ["AC3", "RCO", "RAU"]:
     with open(f"../instances/{topology}_random/{symbol}{size}/{category}/{instance_number}_dv.pkl", "rb") as f:
         h, J = pickle.load(f)
