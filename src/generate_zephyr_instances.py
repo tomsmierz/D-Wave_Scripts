@@ -200,9 +200,9 @@ if __name__ == "__main__":
                         help="Size of the zephyr graph. Minimum 1. Default is 2 (Z2).")
     parser.add_argument("-N", "--number", type=int, default=1,
                         help="Number of instances to be generated. Default is 1.")
-    parser.add_argument("-C", "--category", type=str, default="RAU", choices=["RAU", "RCO"],
+    parser.add_argument("-C", "--category", type=str, default="RAU", choices=["RAU", "RCO", "AC3"],
                         help="Category of generated instances. RAU - random uniform, RCO - random couplings only, "
-                             "AC3 - anti-cluster. AC3 not implemented yet")
+                             "AC3 - anti-cluster")
     parser.add_argument("-P", "--path", type=str, default=path,
                         help="path to folder where generated instances will be located. "
                              "Default is working directory")
