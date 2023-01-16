@@ -4,9 +4,9 @@ import dwave_networkx as dnx
 import pandas as pd
 from dwave.system import DWaveSampler
 from src.generate_pegasus_instances import generate_pegasus_instances, nice_to_spin_glass
-from src.generate_zephyr_instances import generate_zephyr_instances, zephyr_to_spin_glass
+from src.generate_zephyr_instances import generate_zephyr_instances, zephyr_to_spin_glass, create_zephyr_spinglass_clusters
 
-CATEGORY = "RAU"
+CATEGORY = "AC3"
 SIZE_P = 4
 SIZE_Z = 2
 
@@ -110,6 +110,7 @@ class ZephyrTest(unittest.TestCase):
 
         cls.h_sg = spin_glass.loc[spin_glass["v"] == spin_glass["w"]]
         cls.J_sg = spin_glass.loc[spin_glass["v"] != spin_glass["w"]]
+        cls.clusters = create_zephyr_spinglass_clusters(cls.zephyr)
 
         with open("instances/001_dv.pkl", "rb") as f:
             cls.h_dv, cls.J_dv = pickle.load(f)
@@ -126,12 +127,18 @@ class ZephyrTest(unittest.TestCase):
                 self.assertTrue(-0.1 <= value <= 0.1)
             elif CATEGORY == "RCO":
                 self.assertTrue(value == 0)
+            else:
+                self.assertTrue(-1 / 9 <= value <= 1 / 9)
 
         for edge, value in self.J_dv.items():
             self.assertIn(edge, self.zephyr.edges())
             if CATEGORY == "RAU":
                 self.assertTrue(-1 <= value <= 1)
             elif CATEGORY == "RCO":
+                self.assertTrue(-1 <= value <= 1)
+            elif self.clusters[edge[0]] == self.clusters[edge[1]]:
+                self.assertTrue(-1/3 <= value <= 1/3)
+            else:
                 self.assertTrue(-1 <= value <= 1)
 
     def test_device_instance(self):
@@ -173,6 +180,9 @@ class ZephyrTest(unittest.TestCase):
 
             for row in self.J_sg.itertuples():
                 self.assertTrue(-1 <= row.value <= 1)
+        else:  # AC3
+            for row in self.h_sg.itertuples():
+                self.assertTrue(-1 / 9 <= row.value <= 1 / 9)
 
 
 if __name__ == '__main__':
