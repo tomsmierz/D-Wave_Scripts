@@ -28,6 +28,20 @@ def reverse_zephyr_sublattice_mapping(mapping: Callable, source: nx.Graph) -> Ca
     return func
 
 
+def create_zephyr_spinglass_clusters(graph: nx.Graph) -> Dict:
+    clusters = {}
+    for u, w, k, j, z in graph.nodes():
+        if u == 0 and w % 2 == 0:
+            clusters[(u, w, k, j, z)] = (2 * (z + 1), w + 1)
+        elif u == 1 and w % 2 == 0:
+            clusters[(u, w, k, j, z)] = (w + 1, 2 * (z + 1))
+        elif u == 0 and w % 2 == 1:
+            clusters[(u, w, k, j, z)] = (2 * z + 2 * j + 1, w + 1)
+        else:
+            clusters[(u, w, k, j, z)] = (w + 1, 2 * z + 2 * j + 1)
+    return clusters
+
+
 def find_map(source: nx.Graph, sampler: DWaveSampler) -> Tuple:
     target = sampler.to_networkx_graph()
     perfect = False
@@ -126,9 +140,12 @@ def generate_zephyr_instances(number: int, size: int, output_path: str, output_t
             bias = {node: 0 for node in graph.nodes()}
             couplings = {edge: rng.uniform(-1, 1) for edge in graph.edges()}
         elif category == "AC3":
-            raise NotImplementedError("Category AC3 not implemented yet")
+            bias = {node: rng.uniform(-1/9, 1/9) for node in graph.nodes()}
+            clusters = create_zephyr_spinglass_clusters(graph)
+            couplings = {edge: rng.uniform(-1/3, 1/3) if clusters[edge[0]] == clusters[edge[1]] else
+                         rng.uniform(-1, 1) for edge in graph.edges}
         else:
-            raise ValueError(f"Category {category} is invalid choice. I should be \"RAU\", \"RCO\" or \"AC3\"")
+            raise ValueError(f"Category {category} is not a valid choice. It should be \"RAU\", \"RCO\" or \"AC3\"")
 
         if username:
             name = name + f"{i + 1}"
