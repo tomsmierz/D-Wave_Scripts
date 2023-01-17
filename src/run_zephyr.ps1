@@ -1,4 +1,4 @@
-$sizes = 2, 3, 4
+$sizes = 8
 $categories = "AC3", "RAU", "RCO"
 foreach ($size in $sizes)
 {
@@ -9,6 +9,6 @@ foreach ($size in $sizes)
     {
       New-Item -ItemType Directory -Path $path
     }
-    python .\generate_zephyr_instances.py -N 100 -S $size -C $cat -T SpinGlass DWave -P $path -D Advantage2_prototype1.1
+    python .\generate_zephyr_instances.py -N 100 -S $size -C $cat -T SpinGlass DWave -P $path
   }
 }
