@@ -164,8 +164,11 @@ def generate_pegasus_instances(number: int, size: int, output_path: str, output_
             bias = {node: rng.uniform(-1/9, 1/9) for node in graph.nodes()}
             couplings = {edge: rng.uniform(-1/3, 1/3) if edge[0][1:3] == edge[1][1:3]
                          else rng.uniform(-1, 1) for edge in graph.edges()}
+        elif category == "CBFM-P":
+            bias = {node: rng.choice([-1, 0], p=[0.85, 0.15]) for node in graph.nodes()}
+            couplings = {edge: rng.choice([-1, 0, 1], p=[0.1, 0.35, 0.55]) for edge in graph.edges()}
         else:
-            raise NotImplementedError("Categories other than RAU not implemented yet")
+            raise ValueError(f"Category {category} is not a valid choice. It should be \"RAU\", \"RCO\" or \"AC3\"")
 
         if username:
             name = name + f"{i + 1}"
@@ -220,7 +223,7 @@ if __name__ == "__main__":
                         help="Size of the pegasus graph. Minimum 2. Default is 4 (P4).")
     parser.add_argument("-N", "--number", type=int, default=1,
                         help="Number of instances to be generated. Default is 1.")
-    parser.add_argument("-C", "--category", type=str, default="RAU", choices=["RAU", "RCO", "AC3"],
+    parser.add_argument("-C", "--category", type=str, default="RAU", choices=["RAU", "RCO", "AC3", "CBFM-P"],
                         help="Category of generated instances. RAU - random uniform, RCO - random couplings only, "
                              "AC3 - anti-cluster")
     parser.add_argument("-P", "--path", type=str, default=path,

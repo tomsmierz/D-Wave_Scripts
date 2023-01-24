@@ -130,7 +130,7 @@ def generate_chimera_instances(number: int, size: int, output_path: str, output_
             couplings = {edge: rng.uniform(-1 / 3, 1 / 3) if edge[0][1:3] == edge[1][1:3]
             else rng.uniform(-1, 1) for edge in graph.edges()}
         else:
-            raise NotImplementedError("Categories other than RAU not implemented yet")
+            raise ValueError(f"Category {category} is not a valid choice. It should be \"RAU\", \"RCO\" or \"AC3\"")
 
         if username:
             name = name + f"{i + 1}"
