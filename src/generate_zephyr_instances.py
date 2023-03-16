@@ -1,14 +1,16 @@
-import dwave_networkx as dnx  # type: ignore
-import networkx as nx
 import argparse
-import numpy as np
 import os
 import pickle
+from math import inf
+from typing import Callable, Dict, List, Optional, Tuple
 
-from typing import Dict, Tuple, List, Optional, Callable
+import dwave_networkx as dnx  # type: ignore
+import networkx as nx
+import numpy as np
 from dwave.system import DWaveSampler
 from tqdm import tqdm
-from math import inf
+
+from src.utils import find_best_mapping
 
 rng = np.random.default_rng()
 path = os.getcwd()
@@ -44,7 +46,6 @@ def create_zephyr_spinglass_clusters(graph: nx.Graph) -> Dict:
 
 def find_map(source: nx.Graph, sampler: DWaveSampler) -> Tuple:
     target = sampler.to_networkx_graph()
-    perfect = False
     mappings = [mapp for mapp in dnx.zephyr_sublattice_mappings(source, target)]
     mapping = None
     best_missing_nodes = None
@@ -59,7 +60,7 @@ def find_map(source: nx.Graph, sampler: DWaveSampler) -> Tuple:
         edge_dict = {(v, w): (node_dict[v], node_dict[w]) for v, w in source.edges()}
 
         if all(node in target.nodes() for node in node_dict.values()) and all(
-            edge in target.edges() for edge in edge_dict.values()
+                edge in target.edges() for edge in edge_dict.values()
         ):
             mapping = mappings[i]
             print("\nPerfect map found")
@@ -78,8 +79,8 @@ def find_map(source: nx.Graph, sampler: DWaveSampler) -> Tuple:
             num_of_missing_edges = len(missing_edges)
 
             if (
-                num_of_missing_nodes <= min_num_of_missing_nodes
-                and num_of_missing_edges <= min_num_of_missing_edges
+                    num_of_missing_nodes <= min_num_of_missing_nodes
+                    and num_of_missing_edges <= min_num_of_missing_edges
             ):
                 min_num_of_missing_nodes = num_of_missing_nodes
                 min_num_of_missing_edges = num_of_missing_edges
@@ -103,29 +104,31 @@ def find_map(source: nx.Graph, sampler: DWaveSampler) -> Tuple:
 
 
 def generate_zephyr_instances(
-    number: int,
-    size: int,
-    output_path: str,
-    output_types: List[str],
-    category: str,
-    device: Optional[str] = None,
-    name: Optional[str] = None,
+        number: int,
+        size: int,
+        output_path: str,
+        output_types: List[str],
+        category: str,
+        device: Optional[str] = None,
+        name: Optional[str] = None,
 ) -> None:
     source = dnx.zephyr_graph(size, coordinates=True)
     username = name is not None
 
-    if device is not None:
-        if device not in ["Advantage2_prototype1.1"]:
-            raise AssertionError(
-                'Device should be set to "Advantage2_prototype1.1" or None'
-            )
-        if size > 4:
-            raise AssertionError("Maximum size for Advantage2 prototype is 4")
-
-        sampler = DWaveSampler(solver=device)
-        mapping, perfect_mapping, missing_nodes, missing_edges = find_map(
-            source, sampler
+    if device not in [None, "Advantage2_prototype1.1"]:
+        raise ValueError(
+            'Device should be set to "Advantage2_prototype1.1" or None'
         )
+    if size > 4:
+        raise AssertionError("Maximum size for Advantage2 prototype is 4")
+
+    if device is not None:
+        sampler = DWaveSampler(solver=device)
+        target = sampler.to_networkx_graph()
+        mappings = [mapp for mapp in dnx.zephyr_sublattice_mappings(source, target)]
+
+        mapping, perfect_mapping, missing_nodes, missing_edges = find_best_mapping(mappings, sampler, source)
+
         if perfect_mapping:
             graph = source
         else:
@@ -148,8 +151,8 @@ def generate_zephyr_instances(
         graph = source
 
     for i in tqdm(
-        range(number),
-        desc=f"generating zephyr instances size = {size}, category={category}: ",
+            range(number),
+            desc=f"generating zephyr instances size = {size}, category={category}: ",
     ):
         if category == "AC3":
             bias = {node: rng.uniform(-1 / 9, 1 / 9) for node in graph.nodes()}
@@ -174,7 +177,7 @@ def generate_zephyr_instances(
         name = f"{name}{i + 1}" if username else f"{i + 1}"
         for output_type in output_types:
             if (
-                output_type == "SpinGlass"
+                    output_type == "SpinGlass"
             ):  # renumeration is very cheap, and we can afford to do this every loop
                 couplings_sg = {
                     (
@@ -248,7 +251,7 @@ if __name__ == "__main__":
         default="RAU",
         choices=["RAU", "RCO", "AC3"],
         help="Category of generated instances. RAU - random uniform, RCO - random couplings only, "
-        "AC3 - anti-cluster",
+             "AC3 - anti-cluster",
     )
     parser.add_argument(
         "-P",
@@ -256,7 +259,7 @@ if __name__ == "__main__":
         type=str,
         default=path,
         help="path to folder where generated instances will be located. "
-        "Default is working directory",
+             "Default is working directory",
     )
     parser.add_argument(
         "-T",
