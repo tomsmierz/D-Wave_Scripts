@@ -135,7 +135,7 @@ def generate_chimera_instances(number: int, size: int, output_path: str, output_
         if username:
             name = name + f"{i + 1}"
         else:
-            name = f"00{i + 1}"[-3:]
+            name = f"00{i + 1}"
 
         for output_type in output_types:
             if output_type == "SpinGlass":  # renumeration is very cheap, and we can afford to do this every loop
