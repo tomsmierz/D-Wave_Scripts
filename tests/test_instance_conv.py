@@ -9,10 +9,11 @@ rng = np.random.default_rng()
 
 
 class MatyasConv(unittest.TestCase):
-
     @classmethod
     def setUpClass(cls) -> None:
-        cls.Q = load_instance(os.path.join(cwd, "..\\instances\\matyas_instances\\G1_py.csv"))
+        cls.Q = load_instance(
+            os.path.join(cwd, "..\\instances\\matyas_instances\\G1_py.csv")
+        )
         cls.s = np.array([rng.choice([0, 1]) for _ in range(800)])
         cls.sp = np.array([-1 if cls.s[i] == 0 else 1 for i in range(800)])
 
@@ -34,5 +35,5 @@ class MatyasConv(unittest.TestCase):
         self.assertEqual(self.Q, q)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
