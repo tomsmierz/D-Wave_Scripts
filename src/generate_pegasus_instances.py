@@ -173,7 +173,7 @@ def generate_pegasus_instances(number: int, size: int, output_path: str, output_
         if username:
             name = name + f"{i + 1}"
         else:
-            name = f"00{i + 1}"
+            name = f"{i + 1}"
 
         for output_type in output_types:
             if output_type == "SpinGlass":  # renumeration is very cheap, and we can afford to do this every loop
@@ -197,7 +197,7 @@ def generate_pegasus_instances(number: int, size: int, output_path: str, output_
             elif output_type == "DWave":
 
                 if device is not None:
-                    
+
                     couplings_dv = {(mapping(edge[0]), mapping(edge[1])): value for edge, value in couplings.items()}
                     bias_dv = {mapping(node): value for node, value in bias.items()}
                     data = [bias_dv, couplings_dv]
