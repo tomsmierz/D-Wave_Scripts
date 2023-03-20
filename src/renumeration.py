@@ -105,7 +105,7 @@ def renumerate(instance_path: str, name: str, size: int):
 if __name__ == "__main__":
 
     for i in tqdm(range(10)):
-        name = f"00{i+1}"[-3:]
+        name = f"{i+1}"
         name = name + "_nd_original"
         renumerate("/home/tsmierzchalski/instances/P8", name, 8)
 

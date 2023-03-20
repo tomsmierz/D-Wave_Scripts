@@ -23,7 +23,7 @@ for topology in ["zephyr"]: #["pegasus", "zephyr"]:
     for j in sizes:
         size = j
         for i in tqdm(range(1, 101)):
-            instance_number = f"00{i}"[-3:]
+            instance_number = f"{i}"
             for category in ["AC3"]:  # ["AC3", "RCO", "RAU", "CBFM-P"]:
                 with open(f"../instances/{topology}_random/{symbol}{size}/{category}/{instance_number}_dv.pkl", "rb") as f:
                     h, J = pickle.load(f)
