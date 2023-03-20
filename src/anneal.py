@@ -1,7 +1,6 @@
 from dwave.system import DWaveSampler
 
 import pickle
-import pandas
 from tqdm import tqdm
 
 """
