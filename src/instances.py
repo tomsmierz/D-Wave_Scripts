@@ -22,12 +22,14 @@ def convert_to_spinglass(Q, path):
     h, J, offset = dimod.qubo_to_ising(Q)
     h = dict(sorted(h.items()))
     J = dict(sorted(J.items()))
-    #target = dnx.pegasus_graph(16, nice_coordinates=True)
+    # target = dnx.pegasus_graph(16, nice_coordinates=True)
     target = dnx.zephyr_graph(19)
     print("searching for embedding...")
     embedding = find_embedding(J, target)
-    if embedding: print("embedding found")
-    else: print("no embedding found")
+    if embedding:
+        print("embedding found")
+    else:
+        print("no embedding found")
     print(embedding)
 
     # with open(path, "w") as f:
@@ -47,7 +49,8 @@ def embedding_spinglass(Q):
         print(f"searching for embedding in Z{i}")
         target = dnx.zephyr_graph(i)
         embedding = find_embedding(J, target)
-        if not embedding: print(f"no embedding found Z{i}")
+        if not embedding:
+            print(f"no embedding found Z{i}")
     print(f"embedding found for Z{i}")
     with open("embedding.pkl", "wb") as f:
         pickle.dump(embedding, f)
@@ -70,4 +73,3 @@ if __name__ == "__main__":
     # for i in range(1, 11):
     #     Q = load_instance(os.path.join(cwd, f"..\\instances\\matyas_instances\\G{i}_py.csv"))
     #     convert_to_spinglass(Q, os.path.join(cwd, f"..\\instances\\matyas_instances\\G{i}.txt"))
-
