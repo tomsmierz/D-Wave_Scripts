@@ -112,7 +112,7 @@ def generate_pegasus_instances(
         raise ValueError("Maximum size for working device is 16")
 
     if device is not None:
-        sampler = DWaveSampler(solver=device)
+        sampler = DWaveSampler(solver=device, token="DEV-c022bc5fbe01bf15d64dc2c8cc5301210a0b6293")
         target = sampler.to_networkx_graph()
         mappings = [mapp for mapp in dnx.pegasus_sublattice_mappings(graph, target)]
         mapping, perfect_mapping, missing_nodes, missing_edges = find_best_mapping(mappings, sampler, graph)
@@ -199,16 +199,16 @@ if __name__ == "__main__":
     #     help="Map instance info physical D-Wave's device. Input None for no Mapping",
     # )
 
-    pegasus_graph_size = 10
+    pegasus_graph_size = 5
     category = "RAU"
 
     test_set_size = 300
     val_set_size = 300
     train_set_size = 15000
-    target_path_test = "~/projects/ncbr-qubo-ml/data/pegasus_lite/test"
-    target_path_val = "~/projects/ncbr-qubo-ml/data/pegasus_lite/val"
-    target_path_train = "~/projects/ncbr-qubo-ml/data/pegasus_lite/train"
-    types = ["DWave"]
+    target_path_test = "/home/aprzybysz/projects/ncbr-qubo-ml/data/pegasus_lite/test"
+    target_path_val = "/home/aprzybysz/projects/ncbr-qubo-ml/data/pegasus_lite/val"
+    target_path_train = "/home/aprzybysz/projects/ncbr-qubo-ml/data/pegasus_lite/train"
+    types = ["SpinGlass"]
     diagonal = True
     device = "Advantage_system6.1"
 

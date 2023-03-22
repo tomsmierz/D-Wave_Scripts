@@ -19,7 +19,7 @@ def write_dwave_file(device, mapping, bias, couplings, output_path: Path):
 
 def write_spin_glass_file(bias_sg, couplings_sg, target_path: Path):
     bias_sg = dict(sorted(bias_sg.items()))
-
+    print("target_path", target_path)
     with target_path.open("w") as f:
         f.write("# \n")
         for node, value in bias_sg.items():
