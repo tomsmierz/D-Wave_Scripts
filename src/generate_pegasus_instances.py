@@ -14,7 +14,6 @@ from src.graph_operations import align_graph_to_mapping, find_best_mapping
 from src.interfaces.filesystem_interface import write_dwave_file, write_spin_glass_file
 from src.utils import nice_to_spin_glass
 
-rng = np.random.default_rng()
 path = os.getcwd()
 
 
@@ -30,25 +29,25 @@ def reverse_pegasus_sublattice_mapping(mapping: Callable, source: nx.Graph) -> C
 
 def job(i, category, graph, output_types, output_path, mapping, name, username):
     if category == "AC3":
-        bias = {node: rng.uniform(-1 / 9, 1 / 9) for node in graph.nodes()}
+        bias = {node: np.random.uniform(-1 / 9, 1 / 9) for node in graph.nodes()}
         couplings = {
-            edge: rng.uniform(-1 / 3, 1 / 3)
+            edge: np.random.uniform(-1 / 3, 1 / 3)
             if edge[0][1:3] == edge[1][1:3]
-            else rng.uniform(-1, 1)
+            else np.random.uniform(-1, 1)
             for edge in graph.edges()
         }
     elif category == "CBFM-P":
-        bias = {node: rng.choice([-1, 0], p=[0.85, 0.15]) for node in graph.nodes()}
+        bias = {node: np.random.choice([-1, 0], p=[0.85, 0.15]) for node in graph.nodes()}
         couplings = {
-            edge: rng.choice([-1, 0, 1], p=[0.1, 0.35, 0.55])
+            edge: np.random.choice([-1, 0, 1], p=[0.1, 0.35, 0.55])
             for edge in graph.edges()
         }
     elif category == "RAU":
-        bias = {node: rng.uniform(-0.1, 0.1) for node in graph.nodes()}
-        couplings = {edge: rng.uniform(-1, 1) for edge in graph.edges()}
+        bias = {node: np.random.uniform(-0.1, 0.1) for node in graph.nodes()}
+        couplings = {edge: np.random.uniform(-1, 1) for edge in graph.edges()}
     elif category == "RCO":
         bias = {node: 0 for node in graph.nodes()}
-        couplings = {edge: rng.uniform(-1, 1) for edge in graph.edges()}
+        couplings = {edge: np.random.uniform(-1, 1) for edge in graph.edges()}
     else:
         raise ValueError(
             f'Category {category} is not a valid choice. It should be "RAU", "RCO" or "AC3"'
