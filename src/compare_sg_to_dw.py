@@ -2,7 +2,7 @@ import dwave_networkx as dnx
 import pandas as pd
 from dwave.system import DWaveSampler
 
-from src.utils import find_best_mapping
+from src.graph_operations import find_best_mapping
 
 df = pd.read_csv(
     "C:\\Users\\tsmierzchalski\\PycharmProjects\\D-Wave_Scripts\\src\\z1.csv"

@@ -1,32 +1,19 @@
 import argparse
 import os
-import pickle
-from typing import Callable, List, Optional, Tuple
+from pathlib import Path
+from typing import List, Optional
 
 import dwave_networkx as dnx
-import networkx as nx
 import numpy as np
 from dwave.system import DWaveSampler
 from tqdm import tqdm
 
-from src.utils import find_best_mapping
+from src.graph_operations import align_graph_to_mapping, chimera_to_spin_glass, find_best_mapping, \
+    reverse_sublattice_mapping
+from src.interfaces.filesystem_interface import write_dwave_file, write_spin_glass_file
 
 rng = np.random.default_rng()
 path = os.getcwd()
-
-
-def reverse_chimera_sublattice_mapping(mapping: Callable, source: nx.Graph) -> Callable:
-    node_dict = {node: mapping(node) for node in source.nodes}
-    reversed_dict = {value: key for key, value in node_dict.items()}
-
-    def func(node: int) -> Tuple:
-        return reversed_dict[node]
-
-    return func
-
-
-def chimera_to_spin_glass(q: Tuple, size: int) -> int:
-    return dnx.chimera_coordinates(size).chimera_to_linear(q)
 
 
 def generate_chimera_instances(
@@ -38,7 +25,7 @@ def generate_chimera_instances(
         device: Optional[str] = None,
         name: Optional[str] = None,
 ) -> None:
-    source = dnx.chimera_graph(size, coordinates=True)
+    graph = dnx.chimera_graph(size, coordinates=True)
 
     if device not in [None, "DW_2000Q_6"]:
         raise ValueError('Device should be set to "DW_2000Q_6" or None')
@@ -49,29 +36,13 @@ def generate_chimera_instances(
     if device is not None:
         sampler = DWaveSampler(solver=device)
         target = sampler.to_networkx_graph()
-        mappings = [mapp for mapp in dnx.chimera_sublattice_mappings(source, target)]
+        mappings = [mapp for mapp in dnx.chimera_sublattice_mappings(graph, target)]
 
-        mapping, perfect_mapping, missing_nodes, missing_edges = find_best_mapping(mappings, sampler, source)
+        mapping, found_perfect_mapping, missing_nodes, missing_edges = find_best_mapping(mappings, sampler, graph)
 
-        if perfect_mapping:
-            graph = source
-        else:
-            reverse_mapping = reverse_chimera_sublattice_mapping(mapping, source)
-            graph = source
-            for node in missing_nodes:
-                graph.remove_node(reverse_mapping(node))
-
-            for edge in missing_edges:
-                edge = tuple(edge)
-                edge = (reverse_mapping(edge[0]), reverse_mapping(edge[1]))
-                reversed_edge = (edge[1], edge[0])
-                if edge in graph.edges():
-                    graph.remove_edge(edge[0], edge[1])
-
-                if reversed_edge in graph.edges():
-                    graph.remove_edge(reversed_edge[0], reversed_edge[1])
-    else:
-        graph = source
+        if not found_perfect_mapping:
+            reverse_mapping = reverse_sublattice_mapping(mapping, graph)
+            align_graph_to_mapping(reverse_mapping, graph, missing_nodes, missing_edges)
 
     for i in tqdm(
             range(number),
@@ -92,18 +63,14 @@ def generate_chimera_instances(
                 for edge in graph.edges()
             }
         else:
-            raise ValueError(
-                f'Category {category} is not a valid choice. It should be "RAU", "RCO" or "AC3"'
-            )
+            raise ValueError(f'Category {category} is not a valid choice. It should be "RAU", "RCO" or "AC3"')
         if name is not None:
             name = f"{i + 1}"
         else:
             name = f"{name}{i + 1}"
 
         for output_type in output_types:
-            if (
-                    output_type == "SpinGlass"
-            ):  # renumeration is very cheap, and we can afford to do this every loop
+            if output_type == "SpinGlass":
                 couplings_sg = {
                     (
                         chimera_to_spin_glass(edge[0], size) + 1,
@@ -118,32 +85,12 @@ def generate_chimera_instances(
                     for node, value in bias.items()
                 }
                 bias_sg = dict(sorted(bias_sg.items()))
-
-                output_name = name + "_sg.txt"
-
-                with open(os.path.join(output_path, output_name), "w") as f:
-                    f.write("# \n")
-                    for node, value in bias_sg.items():
-                        f.write(str(node) + " " + str(node) + " " + str(value) + "\n")
-                    for edge, value in couplings_sg.items():
-                        f.write(
-                            str(edge[0]) + " " + str(edge[1]) + " " + str(value) + "\n"
-                        )
+                target_path = Path(output_path) / f"{name}_sg.txt"
+                write_spin_glass_file(bias_sg, couplings_sg, target_path)
 
             elif output_type == "DWave":
-                if device is not None:
-                    couplings_dv = {
-                        (mapping(edge[0]), mapping(edge[1])): value
-                        for edge, value in couplings.items()
-                    }
-                    bias_dv = {mapping(node): value for node, value in bias.items()}
-                    data = [bias_dv, couplings_dv]
-                else:
-                    data = [bias, couplings]
-
-                output_name = name + "_dv.pkl"
-                with open(os.path.join(output_path, output_name), "wb") as f:
-                    pickle.dump(data, f)
+                target_path = Path(output_path) / f"{name}_dv.pkl"
+                write_dwave_file(device, mapping, bias, couplings, target_path)
 
             elif output_type == "MatrixMarket":
                 raise NotImplementedError("MatrixMarket output not implemented yet")

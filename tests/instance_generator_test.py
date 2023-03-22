@@ -25,14 +25,14 @@ class PegasusTest(unittest.TestCase):
         generate_pegasus_instances(
             number=2,
             size=SIZE_P,
-            output_path="instances",
+            target_path="instances",
             output_types=["SpinGlass", "DWave"],
             category=CATEGORY,
         )
         generate_pegasus_instances(
             number=1,
             size=SIZE_P,
-            output_path="instances",
+            target_path="instances",
             output_types=["DWave"],
             category=CATEGORY,
             device="Advantage_system6.1",
@@ -133,14 +133,14 @@ class ZephyrTest(unittest.TestCase):
         generate_zephyr_instances(
             number=2,
             size=SIZE_Z,
-            output_path="instances",
+            target_path="instances",
             output_types=["SpinGlass", "DWave"],
             category=CATEGORY,
         )
         generate_zephyr_instances(
             number=1,
             size=SIZE_Z,
-            output_path="instances",
+            target_path="instances",
             output_types=["DWave"],
             category=CATEGORY,
             device="Advantage2_prototype1.1",
