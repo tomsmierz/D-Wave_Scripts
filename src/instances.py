@@ -22,20 +22,12 @@ def convert_to_spinglass(Q, path):
     h, J, offset = dimod.qubo_to_ising(Q)
     h = dict(sorted(h.items()))
     J = dict(sorted(J.items()))
-    #target = dnx.pegasus_graph(16, nice_coordinates=True)
-    target = dnx.zephyr_graph(19)
-    print("searching for embedding...")
-    embedding = find_embedding(J, target)
-    if embedding: print("embedding found")
-    else: print("no embedding found")
-    print(embedding)
-
-    # with open(path, "w") as f:
-    #     f.write(f"# offset: {offset} \n")
-    #     for i, v in h.items():
-    #         f.write(f"{i} {i} {v}\n")
-    #     for (i, j), v in J.items():
-    #         f.write(f"{i} {j} {v}\n")
+    with open(path, "w") as f:
+        f.write(f"# offset: {offset} \n")
+        for i, v in h.items():
+            f.write(f"{i+1} {i+1} {v}\n")
+        for (i, j), v in J.items():
+            f.write(f"{i+1} {j+1} {v}\n")
 
 
 def embedding_spinglass(Q):
@@ -66,8 +58,7 @@ def vectorize(h: dict, J: dict):
 
 if __name__ == "__main__":
     Q = load_instance(os.path.join(cwd, f"..\\instances\\matyas_instances\\G1_py.csv"))
-    embedding_spinglass(Q)
-    # for i in range(1, 11):
-    #     Q = load_instance(os.path.join(cwd, f"..\\instances\\matyas_instances\\G{i}_py.csv"))
-    #     convert_to_spinglass(Q, os.path.join(cwd, f"..\\instances\\matyas_instances\\G{i}.txt"))
+    for i in range(1, 11):
+        Q = load_instance(os.path.join(cwd, f"..\\instances\\matyas_instances\\G{i}_py.csv"))
+        convert_to_spinglass(Q, os.path.join(cwd, f"..\\instances\\matyas_instances\\G{i}.txt"))
 
