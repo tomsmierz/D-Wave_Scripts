@@ -41,20 +41,21 @@ def find_map(source: nx.Graph, sampler: DWaveSampler) -> Tuple:
     best_imperfect_mapping = None
 
     for i in tqdm(range(len(mappings)), desc="Searching for a perfect mapping"):
-
         node_dict = {node: mappings[i](node) for node in source.nodes()}
         edge_dict = {(v, w): (node_dict[v], node_dict[w]) for v, w in source.edges()}
 
-        if all(node in target.nodes() for node in node_dict.values()) and \
-                all(edge in target.edges() for edge in edge_dict.values()):
-
+        if all(node in target.nodes() for node in node_dict.values()) and all(
+            edge in target.edges() for edge in edge_dict.values()
+        ):
             mapping = mappings[i]
             print("\nPerfect map found")
             perfect = True
             break
         else:
             mapped_source_nodes_set = set(node_dict.values())
-            mapped_source_edges_set = set([frozenset(edge) for edge in edge_dict.values()])
+            mapped_source_edges_set = set(
+                [frozenset(edge) for edge in edge_dict.values()]
+            )
 
             real_nodes_set = set(sampler.nodelist)
             real_edges_set = set([frozenset(edge) for edge in sampler.edgelist])
@@ -64,7 +65,10 @@ def find_map(source: nx.Graph, sampler: DWaveSampler) -> Tuple:
             num_of_missing_nodes = len(missing_nodes)
             num_of_missing_edges = len(missing_edges)
 
-            if num_of_missing_nodes <= min_num_of_missing_nodes and num_of_missing_edges <= min_num_of_missing_edges:
+            if (
+                num_of_missing_nodes <= min_num_of_missing_nodes
+                and num_of_missing_edges <= min_num_of_missing_edges
+            ):
                 min_num_of_missing_nodes = num_of_missing_nodes
                 min_num_of_missing_edges = num_of_missing_edges
                 best_missing_nodes = missing_nodes
@@ -73,29 +77,41 @@ def find_map(source: nx.Graph, sampler: DWaveSampler) -> Tuple:
 
     if mapping is None:
         mapping = best_imperfect_mapping
-        print(f"\nNo perfect map found. Returning imperfect map with {min_num_of_missing_nodes} missing nodes"
-              f" and {min_num_of_missing_edges} missing edges")
+        print(
+            f"\nNo perfect map found. Returning imperfect map with {min_num_of_missing_nodes} missing nodes"
+            f" and {min_num_of_missing_edges} missing edges"
+        )
 
     if mapping is None:
-        raise RuntimeError("No map found. Possible problem with the source or the target graph")
+        raise RuntimeError(
+            "No map found. Possible problem with the source or the target graph"
+        )
 
     return mapping, perfect, best_missing_nodes, best_missing_edges
 
 
-def generate_chimera_instances(number: int, size: int, output_path: str, output_types: List[str],
-                               category: str, device: Optional[str] = None,
-                               name: Optional[str] = None) -> None:
+def generate_chimera_instances(
+    number: int,
+    size: int,
+    output_path: str,
+    output_types: List[str],
+    category: str,
+    device: Optional[str] = None,
+    name: Optional[str] = None,
+) -> None:
     source = dnx.chimera_graph(size, coordinates=True)
     username = True if name is not None else False
 
     if device is not None:
         if device not in ["DW_2000Q_6"]:
-            raise AssertionError("Device should be set to \"DW_2000Q_6\" or None")
+            raise AssertionError('Device should be set to "DW_2000Q_6" or None')
         if size > 16:
             raise AssertionError("Maximum size for working chimera device is 16")
 
         sampler = DWaveSampler(solver=device)
-        mapping, perfect_mapping, missing_nodes, missing_edges = find_map(source, sampler)
+        mapping, perfect_mapping, missing_nodes, missing_edges = find_map(
+            source, sampler
+        )
         if perfect_mapping:
             graph = source
         else:
@@ -117,8 +133,10 @@ def generate_chimera_instances(number: int, size: int, output_path: str, output_
     else:
         graph = source
 
-    for i in tqdm(range(number), desc=f"generating Chimera instances size = {size}, category={category}: "):
-
+    for i in tqdm(
+        range(number),
+        desc=f"generating Chimera instances size = {size}, category={category}: ",
+    ):
         if category == "RAU":
             bias = {node: rng.uniform(-0.1, 0.1) for node in graph.nodes()}
             couplings = {edge: rng.uniform(-1, 1) for edge in graph.edges()}
@@ -127,24 +145,39 @@ def generate_chimera_instances(number: int, size: int, output_path: str, output_
             couplings = {edge: rng.uniform(-1, 1) for edge in graph.edges()}
         elif category == "AC3":
             bias = {node: rng.uniform(-1 / 9, 1 / 9) for node in graph.nodes()}
-            couplings = {edge: rng.uniform(-1 / 3, 1 / 3) if edge[0][1:3] == edge[1][1:3]
-            else rng.uniform(-1, 1) for edge in graph.edges()}
+            couplings = {
+                edge: rng.uniform(-1 / 3, 1 / 3)
+                if edge[0][1:3] == edge[1][1:3]
+                else rng.uniform(-1, 1)
+                for edge in graph.edges()
+            }
         else:
-            raise ValueError(f"Category {category} is not a valid choice. It should be \"RAU\", \"RCO\" or \"AC3\"")
+            raise ValueError(
+                f'Category {category} is not a valid choice. It should be "RAU", "RCO" or "AC3"'
+            )
 
         if username:
             name = name + f"{i + 1}"
         else:
-            name = f"00{i + 1}"[-3:]
+            name = f"{i + 1}"
 
         for output_type in output_types:
-            if output_type == "SpinGlass":  # renumeration is very cheap, and we can afford to do this every loop
-
-                couplings_sg = {(chimera_to_spin_glass(edge[0], size) + 1, chimera_to_spin_glass(edge[1], size) + 1):
-                                value for edge, value in couplings.items()}
+            if (
+                output_type == "SpinGlass"
+            ):  # renumeration is very cheap, and we can afford to do this every loop
+                couplings_sg = {
+                    (
+                        chimera_to_spin_glass(edge[0], size) + 1,
+                        chimera_to_spin_glass(edge[1], size) + 1,
+                    ): value
+                    for edge, value in couplings.items()
+                }
                 couplings_sg = dict(sorted(couplings_sg.items()))
 
-                bias_sg = {chimera_to_spin_glass(node, size) + 1: value for node, value in bias.items()}
+                bias_sg = {
+                    chimera_to_spin_glass(node, size) + 1: value
+                    for node, value in bias.items()
+                }
                 bias_sg = dict(sorted(bias_sg.items()))
 
                 output_name = name + "_sg.txt"
@@ -154,13 +187,16 @@ def generate_chimera_instances(number: int, size: int, output_path: str, output_
                     for node, value in bias_sg.items():
                         f.write(str(node) + " " + str(node) + " " + str(value) + "\n")
                     for edge, value in couplings_sg.items():
-                        f.write(str(edge[0]) + " " + str(edge[1]) + " " + str(value) + "\n")
+                        f.write(
+                            str(edge[0]) + " " + str(edge[1]) + " " + str(value) + "\n"
+                        )
 
             elif output_type == "DWave":
-
                 if device is not None:
-
-                    couplings_dv = {(mapping(edge[0]), mapping(edge[1])): value for edge, value in couplings.items()}
+                    couplings_dv = {
+                        (mapping(edge[0]), mapping(edge[1])): value
+                        for edge, value in couplings.items()
+                    }
                     bias_dv = {mapping(node): value for node, value in bias.items()}
                     data = [bias_dv, couplings_dv]
                 else:
@@ -174,33 +210,63 @@ def generate_chimera_instances(number: int, size: int, output_path: str, output_
                 raise NotImplementedError("MatrixMarket output not implemented yet")
 
             else:
-                raise ValueError(f"{output_type} is not valid output type. It should be \"SpinGlass\", \"DWave\", "
-                                 f"or \"MatrixMarket\"")
+                raise ValueError(
+                    f'{output_type} is not valid output type. It should be "SpinGlass", "DWave", '
+                    f'or "MatrixMarket"'
+                )
 
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser()
-    parser.add_argument("-S", "--size", type=int, default=4,
-                        help="Size of the Chimera graph. Default is 4 (C4).")
-    parser.add_argument("-N", "--number", type=int, default=1,
-                        help="Number of instances to be generated. Default is 1.")
-    parser.add_argument("-C", "--category", type=str, default="RAU", choices=["RAU", "RCO", "AC3"],
-                        help="Category of generated instances. RAU - random uniform, RCO - random couplings only, "
-                             "AC3 - anti-cluster")
-    parser.add_argument("-P", "--path", type=str, default=path,
-                        help="path to folder where generated instances will be located. "
-                             "Default is working directory")
-    parser.add_argument("-T", "--types", type=str, default=["SpinGlass"],
-                        choices=["SpinGlass", "DWave", "MatrixMarket"], nargs="*")
-    parser.add_argument("-D", "--device", default=None,
-                        choices=["DW_2000Q_6", None],
-                        help="Map instance info physical D-Wave's device. Input None for no Mapping")
+    parser.add_argument(
+        "-S",
+        "--size",
+        type=int,
+        default=4,
+        help="Size of the Chimera graph. Default is 4 (C4).",
+    )
+    parser.add_argument(
+        "-N",
+        "--number",
+        type=int,
+        default=1,
+        help="Number of instances to be generated. Default is 1.",
+    )
+    parser.add_argument(
+        "-C",
+        "--category",
+        type=str,
+        default="RAU",
+        choices=["RAU", "RCO", "AC3"],
+        help="Category of generated instances. RAU - random uniform, RCO - random couplings only, "
+        "AC3 - anti-cluster",
+    )
+    parser.add_argument(
+        "-P",
+        "--path",
+        type=str,
+        default=path,
+        help="path to folder where generated instances will be located. "
+        "Default is working directory",
+    )
+    parser.add_argument(
+        "-T",
+        "--types",
+        type=str,
+        default=["SpinGlass"],
+        choices=["SpinGlass", "DWave", "MatrixMarket"],
+        nargs="*",
+    )
+    parser.add_argument(
+        "-D",
+        "--device",
+        default=None,
+        choices=["DW_2000Q_6", None],
+        help="Map instance info physical D-Wave's device. Input None for no Mapping",
+    )
 
     args = parser.parse_args()
 
-    generate_chimera_instances(args.number, args.size, args.path, args.types, args.category, device=args.device)
-
-
-
-
+    generate_chimera_instances(
+        args.number, args.size, args.path, args.types, args.category, device=args.device
+    )

@@ -3,8 +3,15 @@ import pickle
 import dwave_networkx as dnx
 import pandas as pd
 from dwave.system import DWaveSampler
-from src.generate_pegasus_instances import generate_pegasus_instances, nice_to_spin_glass
-from src.generate_zephyr_instances import generate_zephyr_instances, zephyr_to_spin_glass, create_zephyr_spinglass_clusters
+from src.generate_pegasus_instances import (
+    generate_pegasus_instances,
+    nice_to_spin_glass,
+)
+from src.generate_zephyr_instances import (
+    generate_zephyr_instances,
+    zephyr_to_spin_glass,
+    create_zephyr_spinglass_clusters,
+)
 
 CATEGORY = "AC3"
 SIZE_P = 4
@@ -15,12 +22,30 @@ class PegasusTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.pegasus = dnx.pegasus_graph(SIZE_P, nice_coordinates=True)
-        generate_pegasus_instances(number=2, size=SIZE_P, output_path="instances", output_types=["SpinGlass", "DWave"],
-                                   category=CATEGORY)
-        generate_pegasus_instances(number=1, size=SIZE_P, output_path="instances", output_types=["DWave"],
-                                   category=CATEGORY, device="Advantage_system6.1", name="qpu")
-        spin_glass = pd.read_csv("instances/001_sg.txt", sep=" ", index_col=False, skiprows=1,
-                                 names=["v", "w", "value"], header=None)
+        generate_pegasus_instances(
+            number=2,
+            size=SIZE_P,
+            output_path="instances",
+            output_types=["SpinGlass", "DWave"],
+            category=CATEGORY,
+        )
+        generate_pegasus_instances(
+            number=1,
+            size=SIZE_P,
+            output_path="instances",
+            output_types=["DWave"],
+            category=CATEGORY,
+            device="Advantage_system6.1",
+            name="qpu",
+        )
+        spin_glass = pd.read_csv(
+            "instances/001_sg.txt",
+            sep=" ",
+            index_col=False,
+            skiprows=1,
+            names=["v", "w", "value"],
+            header=None,
+        )
 
         cls.h_sg = spin_glass.loc[spin_glass["v"] == spin_glass["w"]]
         cls.J_sg = spin_glass.loc[spin_glass["v"] != spin_glass["w"]]
@@ -45,7 +70,7 @@ class PegasusTest(unittest.TestCase):
                 self.assertTrue(-1 <= row.value <= 1)
         else:  # AC3
             for row in self.h_sg.itertuples():
-                self.assertTrue(-1/9 <= row.value <= 1/9)
+                self.assertTrue(-1 / 9 <= row.value <= 1 / 9)
 
     def test_dv_instance(self):
         self.assertIsInstance(self.h_dv, dict)
@@ -60,7 +85,7 @@ class PegasusTest(unittest.TestCase):
             elif CATEGORY == "RCO":
                 self.assertTrue(value == 0)
             else:
-                self.assertTrue(-1/9 <= value <= 1/9)
+                self.assertTrue(-1 / 9 <= value <= 1 / 9)
 
         for edge, value in self.J_dv.items():
             self.assertIn(edge, self.pegasus.edges())
@@ -69,7 +94,7 @@ class PegasusTest(unittest.TestCase):
             elif CATEGORY == "RCO":
                 self.assertTrue(-1 <= value <= 1)
             elif edge[0][1:3] == edge[1][1:3]:
-                self.assertTrue(-1/3 <= value <= 1/3)
+                self.assertTrue(-1 / 3 <= value <= 1 / 3)
             else:
                 self.assertTrue(-1 <= value <= 1)
 
@@ -81,12 +106,16 @@ class PegasusTest(unittest.TestCase):
 
     def test_same_instances(self):
         for node, value in self.h_dv.items():
-            index = self.h_sg.loc[self.h_sg["v"] == nice_to_spin_glass(node, SIZE_P)].index[0]
+            index = self.h_sg.loc[
+                self.h_sg["v"] == nice_to_spin_glass(node, SIZE_P)
+            ].index[0]
             self.assertAlmostEqual(value, self.h_sg.at[index, "value"], 15)
 
         for edge, value in self.J_dv.items():
             index = self.J_sg.loc[self.J_sg["v"] == nice_to_spin_glass(edge[0], SIZE_P)]
-            index = index.loc[index["w"] == nice_to_spin_glass(edge[1], SIZE_P)].index[0]
+            index = index.loc[index["w"] == nice_to_spin_glass(edge[1], SIZE_P)].index[
+                0
+            ]
             self.assertAlmostEqual(value, self.J_sg.at[index, "value"], 15)
 
     def test_different_instances(self):
@@ -101,12 +130,30 @@ class ZephyrTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.zephyr = dnx.zephyr_graph(SIZE_Z, coordinates=True)
-        generate_zephyr_instances(number=2, size=SIZE_Z, output_path="instances", output_types=["SpinGlass", "DWave"],
-                                  category=CATEGORY)
-        generate_zephyr_instances(number=1, size=SIZE_Z, output_path="instances", output_types=["DWave"],
-                                   category=CATEGORY, device="Advantage2_prototype1.1", name="zqpu")
-        spin_glass = pd.read_csv("instances/001_sg.txt", sep=" ", index_col=False, skiprows=1,
-                                 names=["v", "w", "value"], header=None)
+        generate_zephyr_instances(
+            number=2,
+            size=SIZE_Z,
+            output_path="instances",
+            output_types=["SpinGlass", "DWave"],
+            category=CATEGORY,
+        )
+        generate_zephyr_instances(
+            number=1,
+            size=SIZE_Z,
+            output_path="instances",
+            output_types=["DWave"],
+            category=CATEGORY,
+            device="Advantage2_prototype1.1",
+            name="zqpu",
+        )
+        spin_glass = pd.read_csv(
+            "instances/001_sg.txt",
+            sep=" ",
+            index_col=False,
+            skiprows=1,
+            names=["v", "w", "value"],
+            header=None,
+        )
 
         cls.h_sg = spin_glass.loc[spin_glass["v"] == spin_glass["w"]]
         cls.J_sg = spin_glass.loc[spin_glass["v"] != spin_glass["w"]]
@@ -137,7 +184,7 @@ class ZephyrTest(unittest.TestCase):
             elif CATEGORY == "RCO":
                 self.assertTrue(-1 <= value <= 1)
             elif self.clusters[edge[0]] == self.clusters[edge[1]]:
-                self.assertTrue(-1/3 <= value <= 1/3)
+                self.assertTrue(-1 / 3 <= value <= 1 / 3)
             else:
                 self.assertTrue(-1 <= value <= 1)
 
@@ -149,12 +196,18 @@ class ZephyrTest(unittest.TestCase):
 
     def test_same_instances(self):
         for node, value in self.h_dv.items():
-            index = self.h_sg.loc[self.h_sg["v"] == zephyr_to_spin_glass(node, SIZE_Z) + 1].index[0]
+            index = self.h_sg.loc[
+                self.h_sg["v"] == zephyr_to_spin_glass(node, SIZE_Z) + 1
+            ].index[0]
             self.assertAlmostEqual(value, self.h_sg.at[index, "value"], 15)
 
         for edge, value in self.J_dv.items():
-            index = self.J_sg.loc[self.J_sg["v"] == zephyr_to_spin_glass(edge[0], SIZE_Z) + 1]
-            index = index.loc[index["w"] == zephyr_to_spin_glass(edge[1], SIZE_Z) + 1].index[0]
+            index = self.J_sg.loc[
+                self.J_sg["v"] == zephyr_to_spin_glass(edge[0], SIZE_Z) + 1
+            ]
+            index = index.loc[
+                index["w"] == zephyr_to_spin_glass(edge[1], SIZE_Z) + 1
+            ].index[0]
             self.assertAlmostEqual(value, self.J_sg.at[index, "value"], 15)
 
     def test_different_instances(self):
@@ -185,5 +238,5 @@ class ZephyrTest(unittest.TestCase):
                 self.assertTrue(-1 / 9 <= row.value <= 1 / 9)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

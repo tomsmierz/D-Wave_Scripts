@@ -22,12 +22,22 @@ def convert_to_spinglass(Q, path):
     h, J, offset = dimod.qubo_to_ising(Q)
     h = dict(sorted(h.items()))
     J = dict(sorted(J.items()))
-    with open(path, "w") as f:
-        f.write(f"# offset: {offset} \n")
-        for i, v in h.items():
-            f.write(f"{i+1} {i+1} {v}\n")
-        for (i, j), v in J.items():
-            f.write(f"{i+1} {j+1} {v}\n")
+    # target = dnx.pegasus_graph(16, nice_coordinates=True)
+    target = dnx.zephyr_graph(19)
+    print("searching for embedding...")
+    embedding = find_embedding(J, target)
+    if embedding:
+        print("embedding found")
+    else:
+        print("no embedding found")
+    print(embedding)
+
+    # with open(path, "w") as f:
+    #     f.write(f"# offset: {offset} \n")
+    #     for i, v in h.items():
+    #         f.write(f"{i} {i} {v}\n")
+    #     for (i, j), v in J.items():
+    #         f.write(f"{i} {j} {v}\n")
 
 
 def embedding_spinglass(Q):
@@ -39,7 +49,8 @@ def embedding_spinglass(Q):
         print(f"searching for embedding in Z{i}")
         target = dnx.zephyr_graph(i)
         embedding = find_embedding(J, target)
-        if not embedding: print(f"no embedding found Z{i}")
+        if not embedding:
+            print(f"no embedding found Z{i}")
     print(f"embedding found for Z{i}")
     with open("embedding.pkl", "wb") as f:
         pickle.dump(embedding, f)
@@ -58,7 +69,7 @@ def vectorize(h: dict, J: dict):
 
 if __name__ == "__main__":
     Q = load_instance(os.path.join(cwd, f"..\\instances\\matyas_instances\\G1_py.csv"))
-    for i in range(1, 11):
-        Q = load_instance(os.path.join(cwd, f"..\\instances\\matyas_instances\\G{i}_py.csv"))
-        convert_to_spinglass(Q, os.path.join(cwd, f"..\\instances\\matyas_instances\\G{i}.txt"))
-
+    embedding_spinglass(Q)
+    # for i in range(1, 11):
+    #     Q = load_instance(os.path.join(cwd, f"..\\instances\\matyas_instances\\G{i}_py.csv"))
+    #     convert_to_spinglass(Q, os.path.join(cwd, f"..\\instances\\matyas_instances\\G{i}.txt"))
