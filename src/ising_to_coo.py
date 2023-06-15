@@ -14,7 +14,7 @@ if __name__ == "__main__":
     for i in range(1, 101):
         name = f"00{i}"[-3:]
         name_full = name + "_sg.txt"
-        instance = pd.read_csv(os.path.join(cwd, "..", "instances", "pegasus_random", "P4", "CBFM-P", name_full),
+        instance = pd.read_csv(os.path.join(cwd, "..", "instances", "pegasus_random", "P8", "CBFM-P", name_full),
                                sep=" ", index_col=False, header=None, comment="#", names=["s1", "s2", "v"])
         h = {}
         J = {}
@@ -25,7 +25,7 @@ if __name__ == "__main__":
                 J[(int(row.s1)-1, int(row.s2)-1)] = int(row.v)
         bqm = dimod.BinaryQuadraticModel(vartype="SPIN")
         bqm = bqm.from_ising(h, J)
-        with open(os.path.join(cwd, "..", f"instances/pegasus_random/P4/CBFM-P/COO/{name}.txt"), "w") as f:
+        with open(os.path.join(cwd, "..", f"instances/pegasus_random/P8/CBFM-P/COO/{name}.txt"), "w") as f:
             coo.dump(bqm, f)
 
 
