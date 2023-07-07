@@ -6,9 +6,10 @@ from tqdm import tqdm
 cwd = os.getcwd()
 
 if __name__ == "__main__":
-    folder = "AC3"
-    size = "Z3"
-    path = os.path.join(cwd, f"..\\energies\\zephyr_random\\{size}\\{folder}")
+    folder = "CBFM-P"
+    size = "P8"
+    topology = "pegasus"
+    path = os.path.join(cwd, f"..\\energies\\{topology}_random\\{size}\\{folder}")
     num_of_diff_runs = 1
 
     best_dwave = []
