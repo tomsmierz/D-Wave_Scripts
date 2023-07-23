@@ -45,8 +45,5 @@ if __name__ == '__main__':
                     f"../energies/{topology}_random/{symbol}{size}/{category}/"
                     f"{instance_number}_{annealing_time}_{num_reads}_{pause}.csv"
                 )
-                break
-            break
-        break
 
 
