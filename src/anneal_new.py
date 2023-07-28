@@ -45,16 +45,26 @@ if __name__ == '__main__':
                         num_reads = 445
                         initial_state = {i: rng.choice([-1, 1]) for i in h.keys()}
                         for anneal in ["forward", "reverse"]:
-                            sample_set = sampler.sample_ising(
-                                h,
-                                J,
-                                anneal_schedule=anneal_schedule if anneal == "forward" else reverse_anneal,
-                                num_reads=num_reads,
-                                auto_scale=False,
-                                label=f"{topology} {size} {instance_number} {category} {annealing_time}",
-                                initial_state=initial_state if anneal == "reverse" else None,
-                                reinitialize_state=True if anneal == "reverse" else False
-                            )
+                            if anneal == "forward":
+                                sample_set = sampler.sample_ising(
+                                    h,
+                                    J,
+                                    anneal_schedule=anneal_schedule,
+                                    num_reads=num_reads,
+                                    auto_scale=False,
+                                    label=f"{topology} {size} {instance_number} {category} {annealing_time}",
+                                )
+                            else:
+                                sample_set = sampler.sample_ising(
+                                    h,
+                                    J,
+                                    anneal_schedule=reverse_anneal,
+                                    num_reads=num_reads,
+                                    auto_scale=False,
+                                    label=f"{topology} {size} {instance_number} {category} {annealing_time}",
+                                    initial_state=initial_state,
+                                    reinitialize_state=True
+                                )
                             df = sample_set.to_pandas_dataframe()
                             an = "" if anneal == "forward" else "_reverse"
                             df.to_csv(
