@@ -20,7 +20,7 @@ if __name__ == '__main__':
         symbol = "P" if topology == "pegasus" else "Z"
         QCP = 0.3 if topology == "pegasus" else 0.25
         for size in sizes:
-            for i in tqdm(range(1, 101), desc=f"{topology} {size} {i}"):
+            for i in tqdm(range(1, 101), desc=f"{topology} {size}"):
                 instance_number = f"00{i}"[-3:]
                 categories = ["AC3", "RCO", "RAU"]
                 if topology == "pegasus":
