@@ -2,8 +2,9 @@ import networkx as nx
 import dwave_networkx as dnx
 import pandas as pd
 import random as rn
+import matplotlib.pyplot as plt
 
-from src.utils import load_pegasus, load_pegasus_tuple
+from utils import load_pegasus, load_pegasus_tuple
 from tqdm import tqdm
 from typing import Dict
 
@@ -113,11 +114,47 @@ def renumerate(instance_path: str, name: str, size: int):
             f.write(f"{str(edge[0])} {str(edge[1])} {str(value)}" + "\n")
 
 
+def nice_to_spin_glass(node: tuple, size: int) -> int:
+    t, y, x, u, k = node
+    if u == 1:
+        a = 4 + k + 1
+    else:
+        a = abs(k - 3) + 1
+    b = abs(y - (size - 2))
+
+    spin_glas_linear = 8 * t + 24 * x + 24 * (size - 1) * b + a
+    return spin_glas_linear
+
+
+def advantage_6_1_to_spinglass_int(r: int, size: int) -> int:
+    if size not in [4]:
+        raise NotImplementedError("only work for P4")
+    (t, y, x, u, k) = dnx.pegasus_coordinates(16).linear_to_nice(r)
+    return nice_to_spin_glass(node=(t, y-2, x-3, u, k), size=size)
+
+
+def advantage_6_1_to_spinglass(node: tuple, size: int) -> int:
+    t, y, x, u, k = node
+    return nice_to_spin_glass(node=(t, y - 2, x - 3, u, k), size=size)
+
+
 if __name__ == "__main__":
-    for i in tqdm(range(10)):
-        name = f"{i+1}"
-        name = name + "_nd_original"
-        renumerate("/home/tsmierzchalski/instances/P8", name, 8)
+    P4 = pd.read_csv(os.path.join(cwd, "..", "energies", "pegasus_random", "P4", "CBFM-P", "001_2_5000.csv"),
+                     index_col=0)
+    row_dict = P4.iloc[0].to_dict()
+    del row_dict["energy"], row_dict["num_occurrences"]
+    node_list = sorted([int(i) for i in list(row_dict.keys())])
+    node_list = [dnx.pegasus_coordinates(16).linear_to_nice(i) for i in node_list]
+    print(len(node_list))
+    temp = dnx.pegasus_graph(4, nice_coordinates=True)
+    temp2 = dnx.pegasus_graph(4, nice_coordinates=True, node_list=node_list)
+    p = dnx.pegasus_graph(4, nice_coordinates=True)
+
+    print(len(temp2.nodes))
+    fig = plt.figure(figsize=(68, 68))
+    #dnx.draw_pegasus(p, labels={node: nice_to_spin_glass(node, 4) for node in temp.nodes}, with_labels=True)
+    dnx.draw_pegasus(temp2, labels={node: advantage_6_1_to_spinglass(node, 4) for node in temp2.nodes}, with_labels=True)
+    plt.show()
 
 
 """ d = {}
