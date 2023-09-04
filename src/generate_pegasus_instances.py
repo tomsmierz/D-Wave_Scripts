@@ -123,10 +123,11 @@ def generate_pegasus_instances(
             "Advantage_system4.1",
             "Advantage_system5.2",
             "Advantage_system6.1",
+            "Advantage_system6.2"
         ]:
             raise AssertionError(
                 'Device should be set to "Advantage_system4.1", "Advantage_system5.2", '
-                '"Advantage_system6.1" or None'
+                '"Advantage_system6.1", "Advantage_system6.2 or None'
             )
         if size > 16:
             raise AssertionError("Maximum size for working device is 16")
@@ -309,6 +310,7 @@ if __name__ == "__main__":
             "Advantage_system4.1",
             "Advantage_system5.2",
             "Advantage_system6.1",
+            "Advantage_system6.2",
             None,
         ],
         help="Map instance info physical D-Wave's device. Input None for no Mapping",
