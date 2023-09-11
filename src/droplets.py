@@ -14,6 +14,11 @@ from typing import Optional
 
 cwd = os.getcwd()
 
+# TODO: add version to ignore trivial symmetries, h = min(h(x, y), h(-x, y))
+# TODO: add PT-data
+# TODO: add SBM-data
+# TODO: X random choices of initial droplet, create set, chose biggest set
+
 
 def df_to_states(df: pd.DataFrame, energy_cutoff: float) -> dict:
     gs_energy = df["energy"].min()
@@ -38,15 +43,14 @@ def find_droplets_hamming(states: dict, hamming_cutoff: int, size: int, permutat
         del temp["energy"], temp["num_occurrences"]
         row_spins = {advantage_6_1_to_spinglass_int(int(k), size): v for k, v in temp.items()}
         row_spins = dict(sorted(row_spins.items()))
-        row_list = list(row_spins.values())
         state = {"index": idx, "spins": row_spins, "energy": row["energy"]}
         if not accepted_states:
             accepted_states.append(state)
         else:
             h_list = []
             for drop in accepted_states:
-                drop_list = list(drop["spins"].values())
-                h = hamming(drop_list, row_list) * len(row_list)
+                drop_dict =drop["spins"]
+                h = dict_hamming(row_spins, drop_dict)
                 h_list.append(h)
             if all([h >= hamming_cutoff for h in h_list]):
                 accepted_states.append(state)
