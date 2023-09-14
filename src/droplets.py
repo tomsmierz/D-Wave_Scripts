@@ -19,98 +19,66 @@ cwd = os.getcwd()
 # TODO: add version to ignore trivial symmetries, h = min(h(x, y), h(-x, y))
 # TODO: add PT-data
 # TODO: add SBM-data
-# TODO: X random choices of initial droplet, create set, chose biggest set
+
+def filter_states_by_energy(states: list, energies: list, energy_cutoff: float) -> tuple:
+    gs_energy = energies.min()
+    mask = energies <= gs_energy + energy_cutoff
+    filtered_states = states[mask]
+    filtered_energies = energies[mask]
+    return filtered_states, filtered_energies
 
 
-def df_to_states(df: pd.DataFrame, energy_cutoff: float) -> dict:
-    gs_energy = df["energy"].min()
-    df = df[df["energy"] <= gs_energy + energy_cutoff]  # this operation preserves indices of the original dataframe
-    return df.to_dict("index")
-
-
-def dict_hamming(d1: dict, d2: dict) -> int:
+def hamming_dist(d1, d2) -> int:
     if len(d1) != len(d2):
-        raise ValueError("dictionaries have different length")
-    s = 0
-    for key in d1.keys():
-        if d1[key] != d2[key]:
-            s += 1
-    return s
+        raise ValueError("Vectors have different lengths")
+    d1_array = np.array(d1)
+    d2_array = np.array(d2)
+    distance = np.sum(d1_array != d2_array)
+    
+    return distance
 
-
-def find_droplets_hamming(states: dict, hamming_cutoff: int, size: int, permutation: Optional[dict] = None) -> list:
+def find_droplets_hamming(states: list, energies: list, hamming_cutoff: int, permutation: Optional[list] = None) -> list:
     accepted_states = []
-    for idx, row in tqdm(states.items()):
-        temp = deepcopy(row)
-        del temp["energy"], temp["num_occurrences"]
-        row_spins = {advantage_6_1_to_spinglass_int(int(k), size): v for k, v in temp.items()}
-        row_spins = dict(sorted(row_spins.items()))
-        state = {"index": idx, "spins": row_spins, "energy": row["energy"]}
+    accepted_energies = []
+    perm_states = [states[i] for i in permutation]
+    perm_energies = [energies[i] for i in permutation]
+
+    for idx, state in enumerate(perm_states):
         if not accepted_states:
             accepted_states.append(state)
+            accepted_energies.append(perm_energies[idx])
         else:
             h_list = []
             for drop in accepted_states:
-                drop_dict =drop["spins"]
-                h = dict_hamming(row_spins, drop_dict)
+                h = hamming_dist(state, drop)
                 h_list.append(h)
             if all([h >= hamming_cutoff for h in h_list]):
                 accepted_states.append(state)
-    return accepted_states
+                accepted_energies.append(perm_energies[idx])
 
-def find_droplets_hamming_union(states: list, hamming_cutoff: int, size: int, permutation: Optional[dict] = None) -> list:
-    random.shuffle(states)  # Shuffle the order of states
-    # Sort the shuffled states by energy (lowest to highest)
+    return accepted_states, accepted_energies
 
-    accepted_states = []
-#     for row in tqdm(states):
-    for row in states:
-
-        temp = deepcopy(row)
-        row_spins = dict(sorted(row.items()))
-        row_list = list(row_spins.values())
-        if not accepted_states:
-            accepted_states.append(row_spins)
-        else:
-            h_list = []
-            for drop in accepted_states:
-                drop_list = list(drop.values())
-                h = hamming(drop_list, row_list) * len(row_list)
-                h_list.append(h)
-            if all([h >= hamming_cutoff for h in h_list]):
-                accepted_states.append(row_spins)
-    return accepted_states
-
-
-def find_max_set(n: int, states: dict, hamming_cutoff: int, size: int, permutation: Optional[dict] = None):
-    max_set = []
+def find_max_set(n: int, states: list, energies: list, hamming_cutoff: int):
+    max_set_st = []
+    max_set_eng = []
     max_set_size = 0
+    permutation = list(range(len(states)))
     
     for i in range(n):
-        accepted_states = find_droplets_hamming(states, hamming_cutoff, size, permutation)
+        random.shuffle(permutation)
+        accepted_states, accepted_energies = find_droplets_hamming(states, energies, hamming_cutoff, permutation)
         
         if len(accepted_states) > max_set_size:
-            max_set = accepted_states
+            max_set_st = accepted_states
+            max_set_eng = accepted_energies
             max_set_size = len(accepted_states)
     
-    return max_set
-
-def find_max_set_union(n: int, states: dict, hamming_cutoff: int, size: int, permutation: Optional[dict] = None):
-    max_set = []
-    max_set_size = 0
-    
-    for i in range(n):
-        accepted_states = find_droplets_hamming_union(states, hamming_cutoff, size, permutation)
-        
-        if len(accepted_states) > max_set_size:
-            max_set = accepted_states
-            max_set_size = len(accepted_states)
-    
-    return max_set
+    return max_set_st, max_set_eng
 
 
 def read_json_files_first_batch(directory: str) -> dict:
-    json_files = {}
+    states_tn = {}
+    energies_tn = {}
     for filename in os.listdir(directory):
         file = os.path.join(directory, filename)
         # checking if it is a file
@@ -118,73 +86,81 @@ def read_json_files_first_batch(directory: str) -> dict:
             with open(file) as f:
                 spinglass_state = json.load(f)
             name = spinglass_state["columns"][0][0][0:3]
-            state_list = []
-            for state in spinglass_state["columns"][15][0]:
-                temp = {int(k): v for k, v in state.items()}
-                state_list.append(temp)
-            if name in json_files.keys():
-                json_files[name].append(state_list)
+            state_list = [list(state.values()) for state in spinglass_state["columns"][16][0]]
+            state_array = np.array(state_list)
+            energy_array = np.array(spinglass_state["columns"][17][0])
+            
+            if name in states_tn:
+                if state_array.ndim > 0:
+                    states_tn[name].append(state_array)
+                if energy_array.ndim > 0:
+                    energies_tn[name].append(energy_array)
             else:
-                json_files[name] = [state_list]
-    return json_files
+                states_tn[name] = [state_array] if state_array.ndim > 0 else []
+                energies_tn[name] = [energy_array] if energy_array.ndim > 0 else []
 
+    # Concatenate the arrays for each name
+    for name in states_tn.keys():
+        if states_tn[name]:
+            states_tn[name] = np.concatenate(states_tn[name])
+        if energies_tn[name]:
+            energies_tn[name] = np.concatenate(energies_tn[name])
+    return states_tn, energies_tn
 
+def states_dwave(states):
+    states_dwave = states.iloc[:, 0:216]
+    energies_dwave = P4["energy"].to_numpy()
+    idx = [advantage_6_1_to_spinglass_int(int(k), 4) - 1 for k, _ in states_dwave.items()]
+    states_dwave = states_dwave.to_numpy()
+    # st_dw = states_dwave[:, idx]
+    states_dwave_reordered = np.empty_like(states_dwave)
+    for i, new_index in enumerate(idx):
+        states_dwave_reordered[:, new_index] = states_dwave[:, i]
+    states_dw, energies_dw = filter_states_by_energy(states_dwave_reordered, energies_dwave, cutoff_energy)
+    return states_dw, energies_dw 
 
 if __name__ == '__main__':
-    cutoff_energy = 1.01
-    cutoff_hamming = 20
-    json_directory = os.path.join(cwd, "droplets", "P4", "CBFM-P", "P4_droplets_new_i6-10")
-    json_files = read_json_files_first_batch(json_directory)
+    cutoff_energy = 2.01
+    cutoff_hamming = 10
+    iterations = 100
+    json_directory = os.path.join(cwd, "droplets", "P4", "CBFM-P", "P4_droplets_new")
+    st_tn, eng_tn = read_json_files_first_batch(json_directory)
     
     instance_names = []  # To store instance names
     counts = []  # To store count_states_in_union
 
-    for name in json_files.keys():
+    for name in st_tn.keys():
         print("instance: ", name)
-        P4 = pd.read_csv(os.path.join(cwd, "energies", "pegasus_random", "P4", "CBFM-P", f"{name}_2_5000.csv"),
-                         index_col=0)
-        states = df_to_states(P4, cutoff_energy)
-        droplets_dwave = find_max_set(50, states, cutoff_hamming, 4)
-        
-        droplets_union = []
-
-        # Create a set to keep track of unique dictionaries
-        unique_dicts = set()
+        P4 = pd.read_csv(os.path.join(cwd, "energies", "pegasus_random", "P4", "CBFM-P", f"{name}_2000_300.csv"),
+                        index_col=0)
+        states_dw, energies_dw = states_dwave(P4)
+        states_tn, energies_tn = st_tn[name], eng_tn[name]
+        droplet_states_dwave, droplet_energies_dwave = find_max_set(iterations, states_dw, energies_dw, cutoff_hamming)
+        union = list(set(map(tuple, droplet_states_dwave)) | set(map(tuple, states_tn)))
+        unique_states_tn = set(map(tuple, states_tn))
+        independent_states_union, independent_energy_union = find_max_set(iterations, union, np.zeros(len(union)), cutoff_hamming)
             
-        # Append dictionaries from droplets_dwave
-        for d2 in droplets_dwave:
-            unique_dict_key = tuple(sorted(d2['spins'].items()))
-            if unique_dict_key not in unique_dicts:
-                droplets_union.append(d2['spins'])
-                unique_dicts.add(unique_dict_key)
-#             print(unique_dicts)
-        for transformation in json_files[name]:
-            # Append dictionaries from transformation
-            for d1 in transformation:
-                unique_dict_key = tuple(sorted(d1.items()))
-                if unique_dict_key not in unique_dicts:
-                    droplets_union.append(d1)
-                    unique_dicts.add(unique_dict_key)
-        
-        independent_droplets_union = find_max_set_union(50, droplets_union, cutoff_hamming, 4)
+        count_states_in_union = 0
+        for state in independent_states_union:
+            hamming_distances = [hamming_dist(state_tn, state) for state_tn in unique_states_tn]
+            if any(distance < cutoff_hamming for distance in hamming_distances):
+                count_states_in_union += 1
 
-        # Count how many states from transformation are in independent_droplets_union
-        count_states_in_union = sum(1 for state in transformation if state in independent_droplets_union)
-        count_states_in_union = count_states_in_union/len(independent_droplets_union)
-        print("How many tensor network droplets are in maximal independent set of all droplets:", count_states_in_union)
+        print("Fraction of states from TN in all states:", count_states_in_union / len(independent_states_union))
+        counts.append(count_states_in_union / len(independent_states_union))
         instance_names.append(name)
-        counts.append(count_states_in_union)
 
-    # Sort the instance names and counts based on instance numbers
-    sorted_data = sorted(zip(instance_names, counts))
-    instance_names, counts = zip(*sorted_data)
+    # Sort the results based on counts
+    sorted_results = sorted(zip(instance_names, counts), key=lambda x: x[0])
+    sorted_names, sorted_values = zip(*sorted_results)
 
     # Plot the graph
     plt.figure(figsize=(10, 5))
-    plt.bar(instance_names, counts)
-    plt.xlabel("Instance Index")
-    plt.ylabel("Droplets (Normalized)")
-#     plt.title("Count Droplets vs. Instance Number")
-    # plt.xticks(range(0, 5), rotation=45, ha="right")
+    plt.ylim((0, 1))
+    plt.bar(sorted_names, sorted_values)
+    plt.xlabel("Instance index")
+    plt.ylabel("Fraction of TN droplets")
+    plt.title("CBFM-P")
+    plt.xticks(rotation=45)
     plt.tight_layout()
     plt.show()
