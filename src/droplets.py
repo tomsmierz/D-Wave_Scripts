@@ -63,7 +63,6 @@ def find_max_set(n: int, states: list, energies: list, hamming_cutoff: int):
     max_set_eng = []
     max_set_size = 0
     permutation = list(range(len(states)))
-    
     for i in range(n):
         random.shuffle(permutation)
         accepted_states, accepted_energies = find_droplets_hamming(states, energies, hamming_cutoff, permutation)
@@ -119,11 +118,27 @@ def states_dwave(states):
     states_dw, energies_dw = filter_states_by_energy(states_dwave_reordered, energies_dwave, cutoff_energy)
     return states_dw, energies_dw 
 
+def create_union(states1, states2):
+    concatenated_states = list(set(map(tuple, states1)) | set(map(tuple, states2)))
+        
+    state_to_energy = {}
+    for state, energy in zip(states_tn, energies_tn):
+        state_tuple = tuple(state)
+        if state_tuple not in state_to_energy:
+            state_to_energy[state_tuple] = energy
+
+    unique_states_tn = np.array(list(state_to_energy.keys()))
+    unique_states_tn_tuples = [tuple(state) for state in unique_states_tn]
+    unique_energies_tn = np.array([state_to_energy[state] for state in unique_states_tn_tuples])        
+    concatenated_energies = np.concatenate([droplet_energies_dwave, unique_energies_tn])
+    return concatenated_states, concatenated_energies
+
+
 if __name__ == '__main__':
     cutoff_energy = 2.01
     cutoff_hamming = 10
     iterations = 100
-    json_directory = os.path.join(cwd, "droplets", "P4", "CBFM-P", "P4_droplets_new")
+    json_directory = os.path.join(cwd, "droplets", "P4", "RCO", "P4_droplets_new")
     st_tn, eng_tn = read_json_files_first_batch(json_directory)
     
     instance_names = []  # To store instance names
@@ -131,14 +146,14 @@ if __name__ == '__main__':
 
     for name in st_tn.keys():
         print("instance: ", name)
-        P4 = pd.read_csv(os.path.join(cwd, "energies", "pegasus_random", "P4", "CBFM-P", f"{name}_2000_300.csv"),
+        P4 = pd.read_csv(os.path.join(cwd, "energies", "pegasus_random", "P4", "RCO", f"{name}_2000_300.csv"),
                         index_col=0)
         states_dw, energies_dw = states_dwave(P4)
         states_tn, energies_tn = st_tn[name], eng_tn[name]
+        unique_states_tn = list(set(map(tuple, states_tn)))
         droplet_states_dwave, droplet_energies_dwave = find_max_set(iterations, states_dw, energies_dw, cutoff_hamming)
-        union = list(set(map(tuple, droplet_states_dwave)) | set(map(tuple, states_tn)))
-        unique_states_tn = set(map(tuple, states_tn))
-        independent_states_union, independent_energy_union = find_max_set(iterations, union, np.zeros(len(union)), cutoff_hamming)
+        concatenated_states, concatenated_energies = create_union(droplet_states_dwave, states_tn)
+        independent_states_union, independent_energy_union = find_max_set(iterations, concatenated_states, concatenated_energies, cutoff_hamming)
             
         count_states_in_union = 0
         for state in independent_states_union:
@@ -160,7 +175,7 @@ if __name__ == '__main__':
     plt.bar(sorted_names, sorted_values)
     plt.xlabel("Instance index")
     plt.ylabel("Fraction of TN droplets")
-    plt.title("CBFM-P")
+    plt.title("RCO")
     plt.xticks(rotation=45)
     plt.tight_layout()
     plt.show()
