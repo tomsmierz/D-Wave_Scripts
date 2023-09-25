@@ -7,6 +7,7 @@ import numpy as np
 import dwave_networkx as dnx
 import matplotlib.pyplot as plt
 
+from collections import namedtuple
 from dwave.system import DWaveSampler
 from renumeration import advantage_6_1_to_spinglass, advantage_6_1_to_spinglass_int
 from scipy.spatial.distance import hamming
@@ -16,11 +17,13 @@ from typing import Optional
 
 cwd = os.getcwd()
 
-# TODO: add version to ignore trivial symmetries, h = min(h(x, y), h(-x, y))
-# TODO: add PT-data
-# TODO: add SBM-data
+def hamming_dist(d1, d2) -> int:
+    if len(d1) != len(d2):
+        raise ValueError("Vectors have different lengths")
+    distance = np.sum(d1 != d2)
+    return distance
 
-def filter_states_by_energy(states: list, energies: list, energy_cutoff: float) -> tuple:
+def filter_states_by_energy(states, energies, energy_cutoff):
     gs_energy = energies.min()
     mask = energies <= gs_energy + energy_cutoff
     filtered_states = states[mask]
@@ -28,141 +31,141 @@ def filter_states_by_energy(states: list, energies: list, energy_cutoff: float) 
     return filtered_states, filtered_energies
 
 
-def hamming_dist(d1, d2) -> int:
-    if len(d1) != len(d2):
-        raise ValueError("Vectors have different lengths")
-    d1_array = np.array(d1)
-    d2_array = np.array(d2)
-    distance = np.sum(d1_array != d2_array)
-    
-    return distance
+def find_droplets_hamming(state_energy_tuple: namedtuple, hamming_cutoff: int, permutation: Optional[list] = None):
+    accepted_states = [] 
+    accepted_energies = [] 
+    AcceptedStateEnergy = namedtuple('AcceptedStateEnergy', ['state', 'energy'])
 
-def find_droplets_hamming(states: list, energies: list, hamming_cutoff: int, permutation: Optional[list] = None) -> list:
-    accepted_states = []
-    accepted_energies = []
-    perm_states = [states[i] for i in permutation]
-    perm_energies = [energies[i] for i in permutation]
+    if permutation is not None:
+        perm_states = [state_energy_tuple.state[i] for i in permutation]
+        perm_energies = [state_energy_tuple.energy[i] for i in permutation]
+    else:
+        perm_states = state_energy_tuple.state
+        perm_energies = state_energy_tuple.energy
 
     for idx, state in enumerate(perm_states):
         if not accepted_states:
             accepted_states.append(state)
             accepted_energies.append(perm_energies[idx])
+        elif any(np.array_equal(state, accepted_state) for accepted_state in accepted_states):
+            pass
         else:
             h_list = []
             for drop in accepted_states:
                 h = hamming_dist(state, drop)
                 h_list.append(h)
-            if all([h >= hamming_cutoff for h in h_list]):
+            if all(h >= hamming_cutoff for h in h_list):
                 accepted_states.append(state)
                 accepted_energies.append(perm_energies[idx])
+    return AcceptedStateEnergy(np.array(accepted_states), np.array(accepted_energies))
 
-    return accepted_states, accepted_energies
 
-def find_max_set(n: int, states: list, energies: list, hamming_cutoff: int):
-    max_set_st = []
-    max_set_eng = []
+def find_max_set(n: int, state_energy_tuple: namedtuple, hamming_cutoff: int):
     max_set_size = 0
-    permutation = list(range(len(states)))
+    StateEnergy = namedtuple('StateEnergy', ['state', 'energy'])
+    permutation = list(range(len(state_energy_tuple.state)))
     for i in range(n):
         random.shuffle(permutation)
-        accepted_states, accepted_energies = find_droplets_hamming(states, energies, hamming_cutoff, permutation)
-        
-        if len(accepted_states) > max_set_size:
-            max_set_st = accepted_states
-            max_set_eng = accepted_energies
-            max_set_size = len(accepted_states)
-    
-    return max_set_st, max_set_eng
+        accepted_state_energy_tuple = find_droplets_hamming(state_energy_tuple, hamming_cutoff, permutation)
+        if len(accepted_state_energy_tuple.state) > max_set_size:
+            new_se = StateEnergy(accepted_state_energy_tuple.state, accepted_state_energy_tuple.energy)
+            max_set_size = len(accepted_state_energy_tuple.state)
+    return new_se
+
+def create_union(states1: namedtuple, states2: namedtuple):
+    StateEnergy = namedtuple('StateEnergy', ['state', 'energy'])
+    new_states = np.vstack((states1.state, states2.state))
+    new_engs = np.hstack((states1.energy, states2.energy))
+    _, idx = np.unique(new_states, axis=0, return_index=True)
+
+    return StateEnergy(new_states[idx], new_engs[idx])
+
+def count_states(independent_states_union, unique_states_tn):
+    count_states_in_union = 0
+    for state in independent_states_union.state:
+        hamming_distances = [hamming_dist(state_tn, state) for state_tn in unique_states_tn.state]
+        if any(distance < cutoff_hamming for distance in hamming_distances):
+            count_states_in_union += 1
+    return count_states_in_union
 
 
-def read_json_files_first_batch(directory: str) -> dict:
-    states_tn = {}
-    energies_tn = {}
+def array_from_dict(dict_list):
+    # Determine the number of states and maximum index to determine the size of the resulting array
+    num_states = len(dict_list)
+    max_index = max(int(key) for d in dict_list for key in d.keys())
+    result_array = np.zeros((num_states, max_index))
+    for i, d in enumerate(dict_list):
+        for key, value in d.items():
+            result_array[i, int(key) - 1] = value
+    return result_array
+
+def read_json_files(directory):
+    instance_data = {}
     for filename in os.listdir(directory):
         file = os.path.join(directory, filename)
-        # checking if it is a file
+        StateEnergy = namedtuple('StateEnergy', ['state', 'energy'])
         if os.path.isfile(file):
             with open(file) as f:
-                spinglass_state = json.load(f)
-            name = spinglass_state["columns"][0][0][0:3]
-            state_list = [list(state.values()) for state in spinglass_state["columns"][16][0]]
-            state_array = np.array(state_list)
-            energy_array = np.array(spinglass_state["columns"][17][0])
-            
-            if name in states_tn:
-                if state_array.ndim > 0:
-                    states_tn[name].append(state_array)
-                if energy_array.ndim > 0:
-                    energies_tn[name].append(energy_array)
-            else:
-                states_tn[name] = [state_array] if state_array.ndim > 0 else []
-                energies_tn[name] = [energy_array] if energy_array.ndim > 0 else []
+                json_data = json.load(f)
+                instance_name = json_data['columns'][json_data['colindex']['lookup']['instance']-1][0].split('_')[0]
+                energy_data = json_data['columns'][json_data['colindex']['lookup']['drop_eng']-1][0]
+                state_data = json_data['columns'][json_data['colindex']['lookup']['ig_states']-1][0]
+                state_data_np = array_from_dict(state_data)
+                energy_data_np = np.array(energy_data)
+                # Check if the instance_name is already in instance_data
+                if instance_name in instance_data:
+                    # If it is, add the state and energy data to the existing named tuple
+                    existing_state_energy = instance_data[instance_name]
+                    new_state_data = np.concatenate((existing_state_energy.state, state_data_np))
+                    new_energy_data = np.concatenate((existing_state_energy.energy, energy_data_np))
+                    # Remove duplicate rows from new_state_data and filter corresponding energy values
+                    unique_rows, unique_indices = np.unique(new_state_data, axis=0, return_index=True)
+                    filtered_energy_data = new_energy_data[unique_indices]
+                    instance_data[instance_name] = StateEnergy(unique_rows, filtered_energy_data)                
+                else:
+                    # If it's not, create a new named tuple for the instance_name
+                    instance_data[instance_name] = StateEnergy(state_data_np, energy_data_np)
+    return instance_data
 
-    # Concatenate the arrays for each name
-    for name in states_tn.keys():
-        if states_tn[name]:
-            states_tn[name] = np.concatenate(states_tn[name])
-        if energies_tn[name]:
-            energies_tn[name] = np.concatenate(energies_tn[name])
-    return states_tn, energies_tn
-
-def states_dwave(states):
-    states_dwave = states.iloc[:, 0:216]
-    energies_dwave = P4["energy"].to_numpy()
-    idx = [advantage_6_1_to_spinglass_int(int(k), 4) - 1 for k, _ in states_dwave.items()]
-    states_dwave = states_dwave.to_numpy()
-    # st_dw = states_dwave[:, idx]
+def states_dwave(states, cutoff_energy, n, t):
+    StateEnergy = namedtuple('StateEnergy', ['state', 'energy'])
+    states_dwave = states.iloc[:, 0:n]
+    energies_dwave = np.array(states["energy"])
+    idx = [advantage_6_1_to_spinglass_int(int(k), t) - 1 for k, _ in states_dwave.items()]
+    states_dwave = np.array(states_dwave)
     states_dwave_reordered = np.empty_like(states_dwave)
     for i, new_index in enumerate(idx):
         states_dwave_reordered[:, new_index] = states_dwave[:, i]
-    states_dw, energies_dw = filter_states_by_energy(states_dwave_reordered, energies_dwave, cutoff_energy)
-    return states_dw, energies_dw 
-
-def create_union(states1, states2):
-    concatenated_states = list(set(map(tuple, states1)) | set(map(tuple, states2)))
-        
-    state_to_energy = {}
-    for state, energy in zip(states_tn, energies_tn):
-        state_tuple = tuple(state)
-        if state_tuple not in state_to_energy:
-            state_to_energy[state_tuple] = energy
-
-    unique_states_tn = np.array(list(state_to_energy.keys()))
-    unique_states_tn_tuples = [tuple(state) for state in unique_states_tn]
-    unique_energies_tn = np.array([state_to_energy[state] for state in unique_states_tn_tuples])        
-    concatenated_energies = np.concatenate([droplet_energies_dwave, unique_energies_tn])
-    return concatenated_states, concatenated_energies
-
+    filtered_states, filtered_energies = filter_states_by_energy(states_dwave_reordered, energies_dwave, cutoff_energy) 
+    filtered_state_energy_tuple = StateEnergy(filtered_states, filtered_energies)
+    return filtered_state_energy_tuple
 
 if __name__ == '__main__':
-    cutoff_energy = 2.01
-    cutoff_hamming = 10
+    cutoff_energy = 1.01
+    cutoff_hamming = 20
     iterations = 100
+    n = 216
+    t = 4 
     json_directory = os.path.join(cwd, "droplets", "P4", "RCO", "P4_droplets_new")
-    st_tn, eng_tn = read_json_files_first_batch(json_directory)
+    stn = read_json_files(json_directory)
     
     instance_names = []  # To store instance names
     counts = []  # To store count_states_in_union
 
-    for name in st_tn.keys():
-        print("instance: ", name)
+    for name in stn.keys():
+        # print("instance: ", name)
+        state_energy_net = stn[name]
         P4 = pd.read_csv(os.path.join(cwd, "energies", "pegasus_random", "P4", "RCO", f"{name}_2000_300.csv"),
                         index_col=0)
-        states_dw, energies_dw = states_dwave(P4)
-        states_tn, energies_tn = st_tn[name], eng_tn[name]
-        unique_states_tn = list(set(map(tuple, states_tn)))
-        droplet_states_dwave, droplet_energies_dwave = find_max_set(iterations, states_dw, energies_dw, cutoff_hamming)
-        concatenated_states, concatenated_energies = create_union(droplet_states_dwave, states_tn)
-        independent_states_union, independent_energy_union = find_max_set(iterations, concatenated_states, concatenated_energies, cutoff_hamming)
-            
-        count_states_in_union = 0
-        for state in independent_states_union:
-            hamming_distances = [hamming_dist(state_tn, state) for state_tn in unique_states_tn]
-            if any(distance < cutoff_hamming for distance in hamming_distances):
-                count_states_in_union += 1
+        state_energy_tuple = states_dwave(P4, cutoff_energy, n, t)
+        state_energy_tn = find_max_set(iterations, state_energy_net, cutoff_hamming)
+        state_energy_dw = find_max_set(iterations, state_energy_tuple, cutoff_hamming)
 
-        print("Fraction of states from TN in all states:", count_states_in_union / len(independent_states_union))
-        counts.append(count_states_in_union / len(independent_states_union))
+        concatenated_se = create_union(state_energy_dw, state_energy_tn)
+        independent_union = find_max_set(iterations, concatenated_se, cutoff_hamming)
+    
+        count_states_in_union = count_states(independent_union, state_energy_tn)
+        counts.append(count_states_in_union / len(independent_union.energy))
         instance_names.append(name)
 
     # Sort the results based on counts
@@ -171,7 +174,7 @@ if __name__ == '__main__':
 
     # Plot the graph
     plt.figure(figsize=(10, 5))
-    plt.ylim((0, 1))
+    # plt.ylim((0, 1))
     plt.bar(sorted_names, sorted_values)
     plt.xlabel("Instance index")
     plt.ylabel("Fraction of TN droplets")
