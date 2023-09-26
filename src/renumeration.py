@@ -127,36 +127,43 @@ def nice_to_spin_glass(node: tuple, size: int) -> int:
 
 
 def advantage_6_1_to_spinglass_int(r: int, size: int) -> int:
-    if size not in [4]:
-        raise NotImplementedError("only work for P4")
+    if size not in [4, 8]:
+        raise NotImplementedError("only work for P4 and P8")
     (t, y, x, u, k) = dnx.pegasus_coordinates(16).linear_to_nice(r)
-    return nice_to_spin_glass(node=(t, y-2, x-3, u, k), size=size)
+    t_off = {4: 0, 8: 2}
+    y_off = {(4, t): 2 for t in [0, 1, 2]} | {(8, 2): 3, (8, 0): 2, (8, 1): 2}
+    x_off = {(4, t): 3 for t in [0, 1, 2]} | {(8, 2): 4, (8, 0): 5, (8, 1): 5}
+    return nice_to_spin_glass(node=((t-t_off[size]) % 3, y-y_off[(size, t)], x-x_off[(size, t)], u, k), size=size)
 
 
 def advantage_6_1_to_spinglass(node: tuple, size: int) -> int:
     t, y, x, u, k = node
-    return nice_to_spin_glass(node=(t, y - 2, x - 3, u, k), size=size)
+    t_off = {4: 0, 8: 2}
+    y_off = {(4, t): 2 for t in [0, 1, 2]} | {(8, 2): 3, (8, 0): 2, (8, 1): 2}
+    x_off = {(4, t): 3 for t in [0, 1, 2]} | {(8, 2): 4, (8, 0): 5, (8, 1): 5}
+    return nice_to_spin_glass(node=((t-t_off[size]) % 3, y-y_off[(size, t)], x-x_off[(size, t)], u, k), size=size)
 
 
 if __name__ == "__main__":
-    P4 = pd.read_csv(os.path.join(cwd, "..", "energies", "pegasus_random", "P4", "CBFM-P", "001_2_5000.csv"),
+    P8 = pd.read_csv(os.path.join(cwd, "..", "energies", "pegasus_random", "P8", "CBFM-P", "001_2000_445.csv"),
                      index_col=0)
-    row_dict = P4.iloc[0].to_dict()
+    row_dict = P8.iloc[0].to_dict()
     del row_dict["energy"], row_dict["num_occurrences"]
     node_list = sorted([int(i) for i in list(row_dict.keys())])
     node_list = [dnx.pegasus_coordinates(16).linear_to_nice(i) for i in node_list]
     print(len(node_list))
-    temp = dnx.pegasus_graph(4, nice_coordinates=True)
-    temp2 = dnx.pegasus_graph(4, nice_coordinates=True, node_list=node_list)
-    p = dnx.pegasus_graph(4, nice_coordinates=True)
+    temp = dnx.pegasus_graph(8, nice_coordinates=True)
+    temp2 = dnx.pegasus_graph(9, nice_coordinates=True, node_list=node_list)
+    p = dnx.pegasus_graph(8, nice_coordinates=True)
 
     print(len(temp2.nodes))
-    fig = plt.figure(figsize=(68, 68))
-    #dnx.draw_pegasus(p, labels={node: nice_to_spin_glass(node, 4) for node in temp.nodes}, with_labels=True)
-    dnx.draw_pegasus(temp2, labels={node: advantage_6_1_to_spinglass(node, 4) for node in temp2.nodes}, with_labels=True)
-    plt.show()
+    fig = plt.figure(figsize=(100, 100))
+    #dnx.draw_pegasus(p,  with_labels=True)
+    dnx.draw_pegasus(temp2, labels={node: advantage_6_1_to_spinglass(node, 8) for node in node_list}, with_labels=True)
+    plt.savefig("P8_5.pdf")
+    #plt.show()
 
-
+# labels={node: nice_to_spin_glass(node, 8) for node in temp.nodes},
 """ d = {}
     for i in range(5):
         x = (rn.randint(0,14), rn.randint(0,14), rn.randint(0,2), rn.randint(0,1), rn.randint(0,3))
