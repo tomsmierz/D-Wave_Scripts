@@ -18,22 +18,22 @@ from tqdm import tqdm
 # TODO: move helper functions to another file?
 
 # Constants
-CUTOFF_ENERGY = 1.01
-CUTOFF_HAMMING = 20
+CUTOFF_ENERGY = 2.01
+CUTOFF_HAMMING = 50
 ITERATIONS = 100
 
 # Instance characteristic
 TOPOLOGY = "pegasus"
-INSTANCE_SYMBOL = "P4"
-INSTANCE_TYPE = "RCO"
-TOPOLOGY_SIZE = 4
+INSTANCE_SYMBOL = "P8"
+INSTANCE_TYPE = "CBFM-P"
+TOPOLOGY_SIZE = 8
 ANNEALING_TIME = 2000  # TODO: remove when all dwave data is aggregated
-NUM_READS = 300  # TODO: remove when all dwave data is aggregated
+NUM_READS = 445  # TODO: remove when all dwave data is aggregated
 
 # Directories
 cwd = os.getcwd()
-json_directory = os.path.join(cwd, "droplets", "P4", "RCO", "P4_droplets_new")
-dwave_directory = os.path.join(cwd, "..", "energies", f"{TOPOLOGY}_random", INSTANCE_SYMBOL, INSTANCE_TYPE)
+json_directory = os.path.join(cwd, "droplets", INSTANCE_SYMBOL, INSTANCE_TYPE, f"{INSTANCE_SYMBOL}_droplets_new")
+dwave_directory = os.path.join(cwd, "energies", f"{TOPOLOGY}_random", INSTANCE_SYMBOL, INSTANCE_TYPE)
 
 # Type aliases
 vector = Union[np.ndarray, list]
@@ -74,7 +74,7 @@ def filter_states_by_energy(states: np.ndarray, energies: np.ndarray, energy_cut
     return filtered_states, filtered_energies
 
 
-def find_droplets_hamming(state_energy_tuple: namedtuple, hamming_cutoff: int, permutation: Optional[list] = None):
+def find_droplets_hamming(state_energy_tuple: namedtuple, hamming_cutoff: int, energy_cutoff: float, permutation: Optional[list] = None):
     accepted_states = [] 
     accepted_energies = [] 
     AcceptedStateEnergy = namedtuple('AcceptedStateEnergy', ['state', 'energy'])
@@ -94,23 +94,25 @@ def find_droplets_hamming(state_energy_tuple: namedtuple, hamming_cutoff: int, p
             pass
         else:
             h_list = []
-            for drop in accepted_states:
+            eng_list = []
+            for (i, drop) in enumerate(accepted_states):
                 h = hamming_dist(state, drop)
                 h_list.append(h)
-            if all(h >= hamming_cutoff for h in h_list):
+                eng_list.append(abs(perm_energies[idx] - accepted_energies[i]))
+            if all(h >= hamming_cutoff for h in h_list) and all(eng <= energy_cutoff for eng in eng_list):
                 accepted_states.append(state)
                 accepted_energies.append(perm_energies[idx])
     return AcceptedStateEnergy(np.array(accepted_states), np.array(accepted_energies))
 
 
-def find_max_set(iterations: int, state_energy_tuple: namedtuple, hamming_cutoff: int):
+def find_max_set(iterations: int, state_energy_tuple: namedtuple, hamming_cutoff: int, energy_cutoff: float):
     set_size = 0
     StateEnergy = namedtuple('StateEnergy', ['state', 'energy'])
     permutation = list(range(len(state_energy_tuple.state)))
 
     for i in range(iterations):
         random.shuffle(permutation)
-        accepted_state_energy_tuple = find_droplets_hamming(state_energy_tuple, hamming_cutoff, permutation)
+        accepted_state_energy_tuple = find_droplets_hamming(state_energy_tuple, hamming_cutoff, energy_cutoff, permutation)
         if len(accepted_state_energy_tuple.state) > set_size:
             new_state_energy = StateEnergy(accepted_state_energy_tuple.state, accepted_state_energy_tuple.energy)
             set_size = len(accepted_state_energy_tuple.state)
@@ -186,11 +188,11 @@ def compute_dwave_spinglass_droplets(dwave_path, spinglass_path):
         instance_df = pd.read_csv(os.path.join(dwave_path, f"{name}_{ANNEALING_TIME}_{NUM_READS}.csv"),
                                   index_col=0)
         state_energy_tuple = get_state_energy_from_dwave(instance_df, CUTOFF_ENERGY, TOPOLOGY_SIZE)
-        state_energy_spin_glass = find_max_set(ITERATIONS, state_energy_net, CUTOFF_HAMMING)
-        state_energy_dwave = find_max_set(ITERATIONS, state_energy_tuple, CUTOFF_HAMMING)
+        state_energy_spin_glass = find_max_set(ITERATIONS, state_energy_net, CUTOFF_HAMMING, CUTOFF_ENERGY)
+        state_energy_dwave = find_max_set(ITERATIONS, state_energy_tuple, CUTOFF_HAMMING, CUTOFF_ENERGY)
 
         concatenated_se = create_union(state_energy_dwave, state_energy_spin_glass)
-        independent_union = find_max_set(ITERATIONS, concatenated_se, CUTOFF_HAMMING)
+        independent_union = find_max_set(ITERATIONS, concatenated_se, CUTOFF_HAMMING, CUTOFF_ENERGY)
 
         count_states_in_union = count_states(independent_union, state_energy_spin_glass)
         counts.append(count_states_in_union / len(independent_union.energy))
@@ -213,7 +215,7 @@ if __name__ == '__main__':
     plt.bar(sorted_names, sorted_values)
     plt.xlabel("Instance index")
     plt.ylabel("Fraction of TN droplets")
-    plt.title("RCO")
+    plt.title(f"{INSTANCE_SYMBOL}, {INSTANCE_TYPE}")
     plt.xticks(rotation=45)
     plt.tight_layout()
     plt.show()
