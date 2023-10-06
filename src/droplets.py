@@ -3,6 +3,7 @@ import os
 import json
 import random
 
+import h5py
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -32,10 +33,14 @@ INSTANCE_TYPE = "CBFM-P"
 TOPOLOGY_SIZE = 4
 
 # Directories
+script_dir = os.path.dirname(os.path.abspath(__file__))
 cwd = os.getcwd()
-json_directory = os.path.join(cwd, "droplets", INSTANCE_SYMBOL, INSTANCE_TYPE, f"{INSTANCE_SYMBOL}_droplets_i1-3")
-dwave_directory = os.path.join(cwd, "energies", f"{TOPOLOGY}_random_aggregated", INSTANCE_SYMBOL, INSTANCE_TYPE)
-minimum_path = os.path.join(cwd, "droplets", INSTANCE_SYMBOL, INSTANCE_TYPE, "minimum.csv")
+root = os.path.dirname(script_dir)
+json_directory = os.path.join(root, "droplets", INSTANCE_SYMBOL, INSTANCE_TYPE, f"{INSTANCE_SYMBOL}_droplets_i1-3")
+dwave_directory = os.path.join(root, "energies", f"{TOPOLOGY}_random_aggregated", INSTANCE_SYMBOL, INSTANCE_TYPE)
+h5_directory = os.path.join(root, "energies", "sbm", f"{TOPOLOGY}_random", INSTANCE_SYMBOL, INSTANCE_TYPE,
+                            "SpinGlass", "tmp")
+minimum_path = os.path.join(root, "droplets", INSTANCE_SYMBOL, INSTANCE_TYPE, "minimum.csv")
 
 # Type aliases
 vector = Union[np.ndarray, list]
@@ -148,6 +153,28 @@ def array_from_dict(dict_list):
     return result_array
 
 
+def read_h5_files(directory, min_path):
+    instance_data = {}
+    df_min = pd.read_csv(min_path, index_col=0)
+    for filename in os.listdir(directory):
+        file = os.path.join(directory, filename)
+        StateEnergy = namedtuple('StateEnergy', ['state', 'energy'])
+        if os.path.isfile(file):
+            file_extension = os.path.splitext(filename)[-1].lower()
+            if file_extension == ".h5":
+                f = h5py.File(file, "r")
+                instance_name = filename.split("_")[0]
+                energies = f['Spectrum']['energies']
+                states = f['Spectrum']["states"]
+                #ground_eng = df_min[df_min.index == instance_name]['Ground energy'].values[0]
+                ground_eng = energies[0]
+                energy_cutoff = APPROX_RATIO * 2 * np.abs(ground_eng)
+                filtered_states, filtered_energies = filter_states_by_energy(states, energies,
+                                                                             energy_cutoff, ground_eng)
+                instance_data[instance_name] = StateEnergy(filtered_states, filtered_energies)
+    return instance_data
+
+
 def read_json_files(directory, beta, eng, bd, cutoff_energy, df_min) -> dict:
     instance_data = {}
     for filename in os.listdir(directory):
@@ -239,26 +266,31 @@ def count_tn_droplets(dwave_path, spinglass_path, minimum_path, beta, eng, bd):
 
 if __name__ == '__main__':
 
-    result_names, counts_dw, counts_tn = compute_dwave_spinglass_droplets(dwave_directory, json_directory, minimum_path, BETA, ENG, BD)
-    # Sort the results based on counts
-    sorted_results_dw = sorted(zip(result_names, counts_dw), key=lambda x: x[0])
-    sorted_names_dw, sorted_values_dw = zip(*sorted_results_dw)
-    sorted_results_tn = sorted(zip(result_names, counts_tn), key=lambda x: x[0])
-    sorted_names_tn, sorted_values_tn = zip(*sorted_results_tn)
-    # Plot the graph
-    fig, ax = plt.subplots(figsize=(10, 5))
+    if False:
+        result_names, counts_dw, counts_tn = compute_dwave_spinglass_droplets(dwave_directory, json_directory, minimum_path, BETA, ENG, BD)
+        # Sort the results based on counts
+        sorted_results_dw = sorted(zip(result_names, counts_dw), key=lambda x: x[0])
+        sorted_names_dw, sorted_values_dw = zip(*sorted_results_dw)
+        sorted_results_tn = sorted(zip(result_names, counts_tn), key=lambda x: x[0])
+        sorted_names_tn, sorted_values_tn = zip(*sorted_results_tn)
+        # Plot the graph
+        fig, ax = plt.subplots(figsize=(10, 5))
 
-    # plt.ylim((0, 1))
-    ax.plot(sorted_names_dw, sorted_values_dw, label = "DW", color = 'red', marker = "o")
-    ax.plot(sorted_names_tn, sorted_values_tn, label = "TN", color = 'blue', marker = "o")
-    ax.legend()
+        # plt.ylim((0, 1))
+        ax.plot(sorted_names_dw, sorted_values_dw, label = "DW", color = 'red', marker = "o")
+        ax.plot(sorted_names_tn, sorted_values_tn, label = "TN", color = 'blue', marker = "o")
+        ax.legend()
 
-    plt.xlabel("Instance index")
-    plt.ylabel("Droplets")
-    plt.title(f"{INSTANCE_SYMBOL}, {INSTANCE_TYPE}, beta={BETA}, eng={ENG}, bond={BD}, approx_ratio={APPROX_RATIO}")
-    plt.xticks(rotation=45)
-    plt.tight_layout()
-    plt.show()
+        plt.xlabel("Instance index")
+        plt.ylabel("Droplets")
+        plt.title(f"{INSTANCE_SYMBOL}, {INSTANCE_TYPE}, beta={BETA}, eng={ENG}, bond={BD}, approx_ratio={APPROX_RATIO}")
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        plt.show()
+    else:
+        data = read_h5_files(h5_directory, minimum_path)
+        energy_cutoff = APPROX_RATIO * 2 * np.abs(-469)
+        print(find_max_set(ITERATIONS, data["001"], CUTOFF_HAMMING, -469, energy_cutoff))
     
     
     # result_names, counts = count_tn_droplets(dwave_directory, json_directory, minimum_path, BETA, ENG, BD)
