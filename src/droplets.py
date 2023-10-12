@@ -7,6 +7,8 @@ import h5py
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import dwave_networkx as dnx
+import networkx as nx
 
 from collections import namedtuple
 from renumeration import advantage_6_1_to_spinglass, advantage_6_1_to_spinglass_int
@@ -45,7 +47,6 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 cwd = os.getcwd()
 root = os.path.dirname(script_dir)
 json_directory = os.path.join(root, "droplets", INSTANCE_SYMBOL, INSTANCE_TYPE, f"{INSTANCE_SYMBOL}_beta05_states1000")
-json_directory2 = os.path.join(root, "droplets", INSTANCE_SYMBOL, INSTANCE_TYPE, f"{INSTANCE_SYMBOL}_droplets_boundary_brute_force")
 
 # json_directory = os.path.join(root, "droplets", INSTANCE_SYMBOL, INSTANCE_TYPE, f"{INSTANCE_SYMBOL}_droplets_i1-2")
 dwave_directory = os.path.join(root, "energies", f"{TOPOLOGY}_random_aggregated", INSTANCE_SYMBOL, INSTANCE_TYPE)
@@ -56,16 +57,40 @@ minimum_path = os.path.join(root, "droplets", INSTANCE_SYMBOL, INSTANCE_TYPE, "m
 # Type aliases
 vector = Union[np.ndarray, list]
 
+
 # Helper functions
+
+def xor(v1: vector, v2: vector) -> vector:
+    assert len(v1) == len(v2)
+    return [1 if v1[i] == v2[i] else 0 for i in range(v1)]
+
 
 def hamming_dist(v1: vector, v2: vector) -> int:
     return hamming(v1, v2) * len(v1)
 
 
-def get_state_energy_from_dwave(data: pd.DataFrame, cutoff_energy: float, instance_size: int, ground_eng: float) -> namedtuple:
+def connected_hamming_dist(state1: vector, state2: vector) -> int:
+
+    xor_state = xor(state1, state2)
+    if TOPOLOGY == "pegasus":
+        graph = dnx.pegasus_graph(TOPOLOGY_SIZE, nice_coordinates=True)
+    else:
+        graph = dnx.zephyr_graph(TOPOLOGY_SIZE)
+    nodes = []
+    for idx, node in enumerate(graph.nodes):
+        if xor_state[idx]:
+            nodes.append(node)
+    subgraph = nx.subgraph(graph, nodes)
+    largest_cc = max(nx.connected_components(subgraph), key=len)
+    return len(largest_cc)
+
+
+def get_state_energy_from_dwave(data: pd.DataFrame, cutoff_energy: float,
+                                instance_size: int, ground_eng: float) -> namedtuple:
     StateEnergy = namedtuple('StateEnergy', ['state', 'energy'])
     states_dwave = copy.deepcopy(data)
-    states_dwave.drop(["energy", "num_occurrences", "annealing_time", "num_reads", "pause_time", "reverse"], axis=1, inplace=True)
+    states_dwave.drop(["energy", "num_occurrences", "annealing_time", "num_reads", "pause_time", "reverse"],
+                      axis=1, inplace=True)
     energies_dwave = data["energy"].to_numpy()
 
     renum = {k: advantage_6_1_to_spinglass_int(int(k), instance_size) - 1 for k in states_dwave.columns}
@@ -74,7 +99,8 @@ def get_state_energy_from_dwave(data: pd.DataFrame, cutoff_energy: float, instan
     states_dwave_reordered = states_dwave[sorted(list(states_dwave.columns))]
     states_dwave_reordered = states_dwave_reordered.to_numpy()
 
-    filtered_states, filtered_energies = filter_states_by_energy(states_dwave_reordered, energies_dwave, cutoff_energy, ground_eng)
+    filtered_states, filtered_energies = filter_states_by_energy(states_dwave_reordered, energies_dwave,
+                                                                 cutoff_energy, ground_eng)
     filtered_state_energy_tuple = StateEnergy(filtered_states, filtered_energies)
 
     return filtered_state_energy_tuple
@@ -90,7 +116,8 @@ def filter_states_by_energy(states: np.ndarray, energies: np.ndarray, cutoff_ene
     return filtered_states, filtered_energies
 
 
-def find_droplets_hamming(state_energy_tuple: namedtuple, hamming_cutoff: int, ground_eng: float, energy_cutoff: float, permutation: Optional[list] = None):
+def find_droplets_hamming(state_energy_tuple: namedtuple, hamming_cutoff: int, ground_eng: float,
+                          energy_cutoff: float, permutation: Optional[list] = None):
     accepted_states = [] 
     accepted_energies = [] 
     AcceptedStateEnergy = namedtuple('AcceptedStateEnergy', ['state', 'energy'])
@@ -120,18 +147,20 @@ def find_droplets_hamming(state_energy_tuple: namedtuple, hamming_cutoff: int, g
     return AcceptedStateEnergy(np.array(accepted_states), np.array(accepted_energies))
 
 
-def find_max_set(iterations: int, state_energy_tuple: namedtuple, hamming_cutoff: int, ground_eng: float, energy_cutoff: float):
+def find_max_set(iterations: int, state_energy_tuple: namedtuple, hamming_cutoff: int,
+                 ground_eng: float, energy_cutoff: float):
     set_size = 0
     StateEnergy = namedtuple('StateEnergy', ['state', 'energy'])
     permutation = list(range(len(state_energy_tuple.state)))
 
     for i in range(iterations):
         random.shuffle(permutation)
-        accepted_state_energy_tuple = find_droplets_hamming(state_energy_tuple, hamming_cutoff, ground_eng, energy_cutoff, permutation)
+        accepted_state_energy_tuple = find_droplets_hamming(state_energy_tuple, hamming_cutoff,
+                                                            ground_eng, energy_cutoff, permutation)
         if len(accepted_state_energy_tuple.state) > set_size:
             new_state_energy = StateEnergy(accepted_state_energy_tuple.state, accepted_state_energy_tuple.energy)
             set_size = len(accepted_state_energy_tuple.state)
-
+    # TODO: check edge case
     return new_state_energy
 
 
@@ -192,9 +221,11 @@ def read_json_files(directory, beta, eng, bd, cutoff_energy, df_min) -> dict:
         file = os.path.join(directory, filename)
         StateEnergy = namedtuple('StateEnergy', ['state', 'energy'])
         if os.path.isfile(file):
-            with open(file) as f:
+            with open(file, encoding='utf-8') as f:
                 json_data = json.load(f)
-                if json_data['columns'][json_data['colindex']['lookup']['β']-1][0] == beta and json_data['columns'][json_data['colindex']['lookup']['eng']-1][0] == eng and json_data['columns'][json_data['colindex']['lookup']['bond_dim']-1][0] == bd:
+                if json_data['columns'][json_data['colindex']['lookup']['β']-1][0] == beta and \
+                        json_data['columns'][json_data['colindex']['lookup']['eng']-1][0] == eng and \
+                        json_data['columns'][json_data['colindex']['lookup']['bond_dim']-1][0] == bd:
                     instance_name = json_data['columns'][json_data['colindex']['lookup']['instance']-1][0].split('_')[0]
                     energy_data = json_data['columns'][json_data['colindex']['lookup']['drop_eng']-1][0]
                     state_data = json_data['columns'][json_data['colindex']['lookup']['ig_states']-1][0]
@@ -219,6 +250,122 @@ def read_json_files(directory, beta, eng, bd, cutoff_energy, df_min) -> dict:
                 else:
                     pass
     return instance_data
+
+
+def compute_droplets(path: str, best_found_path: str, solver: Optional[str], **kwargs):
+
+    if solver not in ["Dwave", "SpinGlass", "SBM", "PT", None]:
+        raise ValueError("Solver should be \"Dwave\", \"SpinGlass\", \"SBM\", \"PT\" or None")
+
+    min_df = pd.read_csv(best_found_path, index_col=0)
+    min_df.index = min_df.index.map(lambda x: str(x).zfill(3))
+    if solver == "Dwave":
+        result_names, counts, _ = compute_droplets_dwave(path, min_df)
+
+    elif solver == "SpinGlass":
+        if "beta" not in kwargs or "eng" not in kwargs or "bd" not in kwargs:
+            raise ValueError("To compute droplets for SpinGlassPEPS parameters beta, eng (cutoff energy in "
+                             "SpinGlassPEPS) and bd (bond dimension) are needed")
+        beta = kwargs["beta"]
+        eng = kwargs["eng"]
+        bd = kwargs["bd"]
+        result_names, counts, _ = compute_droplets_spiglass(path, min_df, beta, eng, bd)
+
+    elif solver == "SBM":
+        result_names, counts, _ = compute_droplets_sbm(path, best_found_path, min_df)
+
+    elif solver == "PT":
+        raise NotImplementedError()
+
+    else:
+        result_names, counts = [], []
+
+    return result_names, counts
+
+
+def compute_droplets_sbm(path: str, best_found_path: str, min_df: pd.DataFrame):
+    result_names = []
+    counts = []
+    state_energy = {}
+    sbm_states = read_h5_files(path, best_found_path)
+
+    for name, state_energy_h in tqdm(sbm_states.items()):
+        if name not in ["001", "002"]:
+            break
+        ground_eng = min_df[min_df.index == name]['Ground energy'].values[0]
+        energy_cutoff = APPROX_RATIO * 2 * np.abs(ground_eng)
+        state_energy_sbm = find_max_set(ITERATIONS, state_energy_h, CUTOFF_HAMMING, ground_eng, energy_cutoff)
+        state_energy[name] = state_energy_sbm
+        count = len(state_energy_sbm.energy)
+
+        counts.append(count)
+        result_names.append(name)
+
+    return result_names, counts, state_energy
+
+
+def compute_droplets_spiglass(path: str, min_df: pd.DataFrame, beta: float, eng: float, bd: int):
+    result_names = []
+    counts = []
+    state_energy = {}
+    spinglass_states = read_json_files(path, beta, eng, bd, CUTOFF_ENERGY, min_df)
+
+    for name, state_energy_tn in tqdm(spinglass_states.items()):
+        if name not in ["001", "002"]:
+            break
+        ground_eng = min_df[min_df.index == name]['Ground energy'].values[0]
+        energy_cutoff = APPROX_RATIO * 2 * np.abs(ground_eng)
+        state_energy_sg = find_max_set(ITERATIONS, state_energy_tn, CUTOFF_HAMMING, ground_eng, energy_cutoff)
+        state_energy[name] = state_energy_sg
+        count = len(state_energy_sg.energy)
+
+        counts.append(count)
+        result_names.append(name)
+
+    return result_names, counts, state_energy
+
+
+def compute_droplets_dwave(path: str, min_df: pd.DataFrame):
+    result_names = []
+    counts = []
+    state_energy = {}
+
+    for filename in tqdm(os.listdir(path)):
+        file = os.path.join(path, filename)
+        name = filename.split(".")[0]
+        if name not in ["001", "002"]:
+            break
+        if os.path.isfile(file):
+            instance_df = pd.read_csv(file, index_col=0)
+            ground_eng = min_df[min_df.index == name]['Ground energy'].values[0]
+            state_energy_tuple = get_state_energy_from_dwave(instance_df, CUTOFF_ENERGY, TOPOLOGY_SIZE, ground_eng)
+            energy_cutoff = APPROX_RATIO * 2 * np.abs(ground_eng)
+            state_energy_dw = find_max_set(ITERATIONS, state_energy_tuple, CUTOFF_HAMMING, ground_eng, energy_cutoff)
+            state_energy["name"] = state_energy_dw
+            count = len(state_energy_dw.energy)
+
+            result_names.append(name)
+            counts.append(count)
+    return result_names, counts, state_energy
+
+
+def count_droplets_in_union(name: str, best_found_path: str, state_energy_1: namedtuple, state_energy_2: namedtuple):
+    result_names = []  # To store instance names
+    counts = []  # To store count_states_in_union
+
+    min_df = pd.read_csv(best_found_path, index_col=0)
+    min_df.index = min_df.index.map(lambda x: str(x).zfill(3))
+    ground_eng = min_df[min_df.index == name]['Ground energy'].values[0]
+
+    energy_cutoff = APPROX_RATIO * 2 * np.abs(ground_eng)
+    concatenated_se = create_union(state_energy_1, state_energy_2)
+    independent_union = find_max_set(ITERATIONS, concatenated_se, CUTOFF_HAMMING, ground_eng, energy_cutoff)
+
+    count_states_in_union = count_states(independent_union, state_energy_2)
+    counts.append(count_states_in_union / len(independent_union.energy))
+    result_names.append(name)
+
+    return result_names, counts
 
 
 def compute_dwave_spinglass_droplets(dwave_path, spinglass_path, minimum_path, beta, eng, bd):
@@ -281,41 +428,38 @@ def count_tn_droplets(dwave_path, spinglass_path, minimum_path, beta, eng, bd):
 
 if __name__ == '__main__':
 
-    if True:
-        result_names, counts_dw, counts_tn, counts_sb = compute_dwave_spinglass_droplets(dwave_directory, json_directory, minimum_path, BETA, ENG, BD)
-        result_names, counts_dw, counts_tn2, counts_sb = compute_dwave_spinglass_droplets(dwave_directory, json_directory2, minimum_path, BETA, ENG, BD)
 
-        # Sort the results based on counts
-        sorted_results_dw = sorted(zip(result_names, counts_dw), key=lambda x: x[0])
-        sorted_names_dw, sorted_values_dw = zip(*sorted_results_dw)
-        sorted_results_tn = sorted(zip(result_names, counts_tn), key=lambda x: x[0])
-        sorted_names_tn, sorted_values_tn = zip(*sorted_results_tn)
-        sorted_results_tn2 = sorted(zip(result_names, counts_tn2), key=lambda x: x[0])
-        sorted_names_tn2, sorted_values_tn2 = zip(*sorted_results_tn2)
-        sorted_results_sb = sorted(zip(result_names, counts_sb), key=lambda x: x[0])
-        sorted_names_sb, sorted_values_sb = zip(*sorted_results_sb)
-        # Plot the graph
-        fig, ax = plt.subplots(figsize=(10, 5))
+    result_names_dw, counts_dw = compute_droplets(dwave_directory, minimum_path, "Dwave")
+    result_names_tn, counts_tn = compute_droplets(json_directory, minimum_path, "SpinGlass",
+                                                  beta=BETA, eng=ENG, bd=BD)
+    result_names_sbm, counts_sbm = compute_droplets(h5_directory, minimum_path, "SBM")
+    # Sort the results based on counts
+    sorted_results_dw = sorted(zip(result_names_dw, counts_dw), key=lambda x: x[0])
+    sorted_names_dw, sorted_values_dw = zip(*sorted_results_dw)
+    sorted_results_tn = sorted(zip(result_names_tn, counts_tn), key=lambda x: x[0])
+    sorted_names_tn, sorted_values_tn = zip(*sorted_results_tn)
+    sorted_results_sb = sorted(zip(result_names_sbm, counts_sbm), key=lambda x: x[0])
+    sorted_names_sb, sorted_values_sb = zip(*sorted_results_sb)
+    # Plot the graph
+    fig, ax = plt.subplots(figsize=(10, 5))
 
-        # plt.ylim((0, 1))
-        ax.plot(sorted_names_dw, sorted_values_dw, "ro", label = "DW")
-        ax.plot(sorted_names_tn, sorted_values_tn, "g*", label = "TN, states 1000")
-        ax.plot(sorted_names_tn, sorted_values_tn2, "m+", label = "TN, boundary")
+    # plt.ylim((0, 1))
+    ax.plot(sorted_names_dw, sorted_values_dw, "ro", label = "DW")
+    ax.plot(sorted_names_tn, sorted_values_tn, "g*", label = "TN, states 1000")
 
-        ax.plot(sorted_names_sb, sorted_values_sb, "bx", label = "SB")
+    ax.plot(sorted_names_sb, sorted_values_sb, "bx", label = "SB")
 
-        ax.legend()
+    ax.legend()
 
-        plt.xlabel("Instance index")
-        plt.ylabel("Droplets")
-        plt.title(f"{INSTANCE_SYMBOL}, {INSTANCE_TYPE}, beta={BETA}, Hamming={CUTOFF_HAMMING}, bond={BD}, approx_ratio={APPROX_RATIO}")
-        plt.xticks(rotation=45)
-        plt.tight_layout()
-        plt.show()
-    else:
-        data = read_h5_files(h5_directory, minimum_path)
-        energy_cutoff = APPROX_RATIO * 2 * np.abs(-469)
-        print(find_max_set(ITERATIONS, data["001"], CUTOFF_HAMMING, -469, energy_cutoff))
+    plt.xlabel("Instance index")
+    plt.ylabel("Droplets")
+    plt.title(f"{INSTANCE_SYMBOL}, {INSTANCE_TYPE}, beta={BETA}, Hamming={CUTOFF_HAMMING}, bond={BD}, approx_ratio={APPROX_RATIO}")
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.show()
+
+
+
     
     
     # result_names, counts = count_tn_droplets(dwave_directory, json_directory, minimum_path, BETA, ENG, BD)
