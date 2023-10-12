@@ -2,6 +2,7 @@ import copy
 import os
 import json
 import random
+import h5py
 
 import pandas as pd
 import numpy as np
@@ -21,9 +22,13 @@ INSTANCE_TYPE = "CBFM-P"
 TOPOLOGY_SIZE = 8
 
 # Directories
+script_dir = os.path.dirname(os.path.abspath(__file__))
 cwd = os.getcwd()
-json_directory = os.path.join(cwd, "droplets", INSTANCE_SYMBOL, INSTANCE_TYPE, f"{INSTANCE_SYMBOL}_droplets_i1-2")
-dwave_directory = os.path.join(cwd, "energies", f"{TOPOLOGY}_random_aggregated", INSTANCE_SYMBOL, INSTANCE_TYPE)
+root = os.path.dirname(script_dir)
+json_directory = os.path.join(root, "droplets", INSTANCE_SYMBOL, INSTANCE_TYPE, f"{INSTANCE_SYMBOL}_beta025_states1000")
+dwave_directory = os.path.join(root, "energies", f"{TOPOLOGY}_random_aggregated", INSTANCE_SYMBOL, INSTANCE_TYPE)
+sb_directory = os.path.join(root, "energies", "sbm", f"{TOPOLOGY}_random", INSTANCE_SYMBOL, INSTANCE_TYPE,
+                            "SpinGlass", "tmp")
 output_csv = os.path.join(cwd, "droplets", INSTANCE_SYMBOL, INSTANCE_TYPE, "minimum.csv")
 
 def read_json_data(directory) -> dict:
@@ -72,18 +77,37 @@ def read_csv_data(data: pd.DataFrame, instance_size: int) -> namedtuple:
 
     return state_energy_tuple
 
-def calculate_and_create_dataframe(dwave_path, spinglass_path, output_csv):
+def read_h5_files(directory):
+    instance_data = {}
+    for filename in os.listdir(directory):
+        file = os.path.join(directory, filename)
+        StateEnergy = namedtuple('StateEnergy', ['state', 'energy'])
+        if os.path.isfile(file):
+            file_extension = os.path.splitext(filename)[-1].lower()
+            if file_extension == ".h5":
+                f = h5py.File(file, "r")
+                instance_name = filename.split("_")[0]
+                energies = f['Spectrum']['energies']
+                states = f['Spectrum']["states"]
+                instance_data[instance_name] = StateEnergy(states, energies)
+    return instance_data
+
+def calculate_and_create_dataframe(dwave_path, spinglass_path, sb_directory, output_csv):
     spinglass_states = read_json_data(spinglass_path)
+    data_sb = read_h5_files(sb_directory)
+
     result_data = []
     
     for name, state_energy_net in tqdm(spinglass_states.items()):
         # print("instance: ", name)
+        sb = data_sb[name]
         instance_df = pd.read_csv(os.path.join(dwave_path, f"{name}.csv"),
                                   index_col=0)
         state_energy_tuple = read_csv_data(instance_df, TOPOLOGY_SIZE)
         ground_eng_dw = state_energy_tuple.energy.min()
         ground_eng_sg = state_energy_net.energy.min()
-        ground_eng = min(ground_eng_dw, ground_eng_sg)
+        ground_eng_sb = sb.energy[()].min()
+        ground_eng = min(ground_eng_dw, ground_eng_sg, ground_eng_sb)
         # Create a DataFrame with instance index and minimum value
         result_data.append({'Index': name, 'Ground energy': ground_eng})
 
@@ -97,4 +121,4 @@ def calculate_and_create_dataframe(dwave_path, spinglass_path, output_csv):
 
 if __name__ == '__main__':
 
-    df = calculate_and_create_dataframe(dwave_directory, json_directory, output_csv)
+    df = calculate_and_create_dataframe(dwave_directory, json_directory, sb_directory, output_csv)
