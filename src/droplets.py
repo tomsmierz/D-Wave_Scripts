@@ -289,8 +289,7 @@ def compute_droplets_sbm(path: str, best_found_path: str, min_df: pd.DataFrame):
     state_energy = {}
     sbm_states = read_h5_files(path, best_found_path)
     for name, state_energy_h in tqdm(sbm_states.items()):
-        if name not in ["001", "002"]:
-            break
+
         ground_eng = min_df[min_df.index == name]['Ground energy'].values[0]
         energy_cutoff = APPROX_RATIO * 2 * np.abs(ground_eng)
         state_energy_sbm = find_max_set(ITERATIONS, state_energy_h, CUTOFF_HAMMING, ground_eng, energy_cutoff)
@@ -311,8 +310,6 @@ def compute_droplets_spiglass(path: str, min_df: pd.DataFrame, beta: float, eng:
     spinglass_states = read_json_files(path, beta, eng, bd, CUTOFF_ENERGY, min_df)
 
     for name, state_energy_tn in tqdm(spinglass_states.items()):
-        if name not in ["001", "002"]:
-            break
         ground_eng = min_df[min_df.index == name]['Ground energy'].values[0]
         energy_cutoff = APPROX_RATIO * 2 * np.abs(ground_eng)
         state_energy_sg = find_max_set(ITERATIONS, state_energy_tn, CUTOFF_HAMMING, ground_eng, energy_cutoff)
@@ -332,8 +329,6 @@ def compute_droplets_dwave(path: str, min_df: pd.DataFrame):
     for filename in tqdm(os.listdir(path)):
         file = os.path.join(path, filename)
         name = filename.split(".")[0]
-        if name not in ["001", "002"]:
-            continue
         if os.path.isfile(file):
             instance_df = pd.read_csv(file, index_col=0)
             ground_eng = min_df[min_df.index == name]['Ground energy'].values[0]
@@ -373,30 +368,33 @@ if __name__ == '__main__':
 
 
     result_names_dw, counts_dw, se_dw = compute_droplets(dwave_directory, minimum_path, "Dwave")
-    result_names_tn, counts_tn, se_tn = compute_droplets(json_directory, minimum_path, "SpinGlass",
-                                                  beta=BETA, eng=ENG, bd=BD)
+    #result_names_tn, counts_tn, se_tn = compute_droplets(json_directory, minimum_path, "SpinGlass",
+    #                                              beta=BETA, eng=ENG, bd=BD)
     result_names_sbm, counts_sbm, se_sbm = compute_droplets(h5_directory, minimum_path, "SBM")
     
-    result_names_dw_tn, union_dw_tn = count_droplets_in_union(minimum_path, se_dw, se_tn)
-    result_names_sbm_tn, union_sbm_tn = count_droplets_in_union(minimum_path, se_sbm, se_tn)
-
+    #result_names_dw_tn, union_dw_tn = count_droplets_in_union(minimum_path, se_dw, se_tn)
+    #result_names_sbm_tn, union_sbm_tn = count_droplets_in_union(minimum_path, se_sbm, se_tn)
+    # result_names_sbm_dw, union_sbm_dw = count_droplets_in_union(minimum_path, se_sbm, se_dw)
     
     sorted_results_dw = sorted(zip(result_names_dw, counts_dw), key=lambda x: x[0])
     sorted_names_dw, sorted_values_dw = zip(*sorted_results_dw)
-    sorted_results_tn = sorted(zip(result_names_tn, counts_tn), key=lambda x: x[0])
-    sorted_names_tn, sorted_values_tn = zip(*sorted_results_tn)
+    #sorted_results_tn = sorted(zip(result_names_tn, counts_tn), key=lambda x: x[0])
+    #sorted_names_tn, sorted_values_tn = zip(*sorted_results_tn)
     sorted_results_sb = sorted(zip(result_names_sbm, counts_sbm), key=lambda x: x[0])
     sorted_names_sb, sorted_values_sb = zip(*sorted_results_sb)
     
-    sorted_results_dw_tn = sorted(zip(result_names_dw_tn, union_dw_tn), key=lambda x: x[0])
-    sorted_names_dw_tn, sorted_values_dw_tn = zip(*sorted_results_dw_tn)
-    sorted_results_sbm_tn = sorted(zip(result_names_sbm_tn, union_sbm_tn), key=lambda x: x[0])
-    sorted_names_sbm_tn, sorted_values_sbm_tn = zip(*sorted_results_sbm_tn)
+   # sorted_results_dw_tn = sorted(zip(result_names_dw_tn, union_dw_tn), key=lambda x: x[0])
+    #sorted_names_dw_tn, sorted_values_dw_tn = zip(*sorted_results_dw_tn)
+    #sorted_results_sbm_tn = sorted(zip(result_names_sbm_tn, union_sbm_tn), key=lambda x: x[0])
+    #sorted_names_sbm_tn, sorted_values_sbm_tn = zip(*sorted_results_sbm_tn)
+
+    # sorted_results_sbm_dw = sorted(zip(result_names_sbm_dw, union_sbm_dw), key=lambda x: x[0])
+    # sorted_names_sbm_dw, sorted_values_sbm_dw = zip(*sorted_results_sbm_dw)
     
     fig1, ax1 = plt.subplots(figsize=(10, 5))
 
     ax1.plot(sorted_names_dw, sorted_values_dw, "ro", label="DW")
-    ax1.plot(sorted_names_tn, sorted_values_tn, "g*", label="TN, states 1000")
+    #ax1.plot(sorted_names_tn, sorted_values_tn, "g*", label="TN, states 1000")
     ax1.plot(sorted_names_sb, sorted_values_sb, "bx", label="SB")
     ax1.legend()
 
@@ -410,13 +408,14 @@ if __name__ == '__main__':
 
     fig2, ax2 = plt.subplots(figsize=(10, 5))
 
-    ax2.plot(sorted_names_dw_tn, sorted_values_dw_tn, "b+", label="Union DW-TN")
-    ax2.plot(sorted_names_sbm_tn, sorted_values_sbm_tn, "r.", label="Union SBM-TN")
-    ax2.legend()
-
-    ax2.set_xlabel("Instance index")
-    ax2.set_ylabel("Union Droplets")
-    ax2.set_title(f"Union of DW-TN and SBM-TN")
+    # ax2.plot(sorted_names_dw_tn, sorted_values_dw_tn, "b+", label="Union DW-TN")
+    # ax2.plot(sorted_names_sbm_tn, sorted_values_sbm_tn, "r.", label="Union SBM-TN")
+    # ax2.plot(sorted_names_sbm_dw, sorted_values_sbm_dw, "r.", label="Union SBM-DW")
+    # ax2.legend()
+    #
+    # ax2.set_xlabel("Instance index")
+    # ax2.set_ylabel("Union Droplets")
+    # ax2.set_title(f"Union and SBM-DW")
 
     plt.tight_layout()
     plt.show()

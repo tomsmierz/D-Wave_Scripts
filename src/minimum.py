@@ -25,11 +25,11 @@ TOPOLOGY_SIZE = 8
 script_dir = os.path.dirname(os.path.abspath(__file__))
 cwd = os.getcwd()
 root = os.path.dirname(script_dir)
-json_directory = os.path.join(root, "droplets", INSTANCE_SYMBOL, INSTANCE_TYPE, f"{INSTANCE_SYMBOL}_beta025_states1000")
+json_directory = os.path.join(root, "droplets", INSTANCE_SYMBOL, INSTANCE_TYPE, f"{INSTANCE_SYMBOL}_beta05_states1000")
 dwave_directory = os.path.join(root, "energies", f"{TOPOLOGY}_random_aggregated", INSTANCE_SYMBOL, INSTANCE_TYPE)
 sb_directory = os.path.join(root, "energies", "sbm", f"{TOPOLOGY}_random", INSTANCE_SYMBOL, INSTANCE_TYPE,
                             "SpinGlass", "tmp")
-output_csv = os.path.join(cwd, "droplets", INSTANCE_SYMBOL, INSTANCE_TYPE, "minimum.csv")
+output_csv = os.path.join(root, "droplets", INSTANCE_SYMBOL, INSTANCE_TYPE, "minimum.csv")
 
 def read_json_data(directory) -> dict:
     instance_data = {}
@@ -98,16 +98,16 @@ def calculate_and_create_dataframe(dwave_path, spinglass_path, sb_directory, out
 
     result_data = []
     
-    for name, state_energy_net in tqdm(spinglass_states.items()):
+    for name, state_energy_net in tqdm(data_sb.items()):
         # print("instance: ", name)
         sb = data_sb[name]
         instance_df = pd.read_csv(os.path.join(dwave_path, f"{name}.csv"),
                                   index_col=0)
         state_energy_tuple = read_csv_data(instance_df, TOPOLOGY_SIZE)
         ground_eng_dw = state_energy_tuple.energy.min()
-        ground_eng_sg = state_energy_net.energy.min()
+        # ground_eng_sg = state_energy_net.energy.min()
         ground_eng_sb = sb.energy[()].min()
-        ground_eng = min(ground_eng_dw, ground_eng_sg, ground_eng_sb)
+        ground_eng = min(ground_eng_dw, ground_eng_sb)
         # Create a DataFrame with instance index and minimum value
         result_data.append({'Index': name, 'Ground energy': ground_eng})
 
