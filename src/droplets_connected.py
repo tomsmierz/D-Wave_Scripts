@@ -2,6 +2,7 @@ import copy
 import os
 import json
 import random
+import time
 
 import h5py
 import pandas as pd
@@ -30,7 +31,7 @@ from tqdm import tqdm
 
 CUTOFF_ENERGY = 60
 CUTOFF_HAMMING = 100
-ITERATIONS = 100
+ITERATIONS = 1
 APPROX_RATIO = 1e-3
 BETA = 0.5
 ENG = 60
@@ -53,7 +54,7 @@ dwave_directory = os.path.join(root, "energies", f"{TOPOLOGY}_random_aggregated"
 h5_directory = os.path.join(root, "energies", "sbm", f"{TOPOLOGY}_random", INSTANCE_SYMBOL, INSTANCE_TYPE,
                             "SpinGlass", "tmp")
 minimum_path = os.path.join(root, "droplets", INSTANCE_SYMBOL, INSTANCE_TYPE, "minimum.csv")
-instance_path = os.path.join(root, "instances", f"{TOPOLOGY}_random", INSTANCE_SYMBOL, INSTANCE_TYPE, "COO")
+instance_path = os.path.join(root, "instances", f"{TOPOLOGY}_random", INSTANCE_SYMBOL, INSTANCE_TYPE)
 # Type aliases
 vector = Union[np.ndarray, list]
 
@@ -65,61 +66,38 @@ def xor(v1: vector, v2: vector) -> vector:
     return [1 if v1[i] == v2[i] else 0 for i in range(len(v1))]
 
 
-def create_graph_from_txt(filename):
-    nodes = []
-    edges = []
-    
-    with open(filename, 'r') as file:
-        for line in file:
-            parts = line.strip().split()
-            if len(parts) == 3:
-                x, y = map(int, parts[:2])
-                Jij = float(parts[2]) 
-                if x not in nodes:
-                    nodes.append(x)
-                if y not in nodes:
-                    nodes.append(y) 
-                if Jij != 0:
-                    edges.append(((x, y), Jij))
-
-    G = nx.Graph()
-    G.add_nodes_from(nodes)
-    G.add_edges_from(edges)
-    return G
-
-
 def hamming_dist(v1: vector, v2: vector) -> int:
     return hamming(v1, v2) * len(v1)
 
 
-def connected_hamming_dist(state1: vector, state2: vector, filename: str) -> int:
-    xor_state = xor(state1, state2)
-    graph = create_graph_from_txt(filename)
+def create_spin_glass_peps_graph(file: str) -> nx.Graph:
+    df = pd.read_csv(file, sep=" ", names=["v", "w", "J"], comment="#")
+    edges = []
     nodes = []
-    for node in list(graph.nodes)[0:1175]:
-        if xor_state[node]:
+    for row in df.itertuples():
+        if row.v != row.w and row.J != 0:
+            edges.append((row.v,row.w))
+        elif row.v == row.w:
+            nodes.append(row.v)
+    g = nx.Graph()
+    g.add_nodes_from(nodes)
+    g.add_edges_from(edges)
+    return g
+
+
+def connected_hamming_dist(state1: vector, state2: vector, graph) -> int:
+    xor_state = xor(state1, state2)
+    nodes = []
+    for node in graph.nodes:
+        if xor_state[node-1]:
             nodes.append(node)
-    print("sub")
+    # begin = time.time()
     subgraph = nx.subgraph(graph, nodes)
+    # end1 = time.time()
     largest_cc = max(nx.connected_components(subgraph), key=len)
-    print(len(largest_cc))
+    # end2 = time.time()
+    # print("time subgraph: ", end1 - begin, " time largest connected components: ", end2 - end1)
     return len(largest_cc)
-
-
-# def connected_hamming_dist(state1: vector, state2: vector) -> int:
-#     xor_state = xor(state1, state2)
-#     if TOPOLOGY == "pegasus":
-#         graph = dnx.pegasus_graph(TOPOLOGY_SIZE, nice_coordinates=True)
-#     else:
-#         graph = dnx.zephyr_graph(TOPOLOGY_SIZE)
-        
-#     nodes = []
-#     for idx, node in enumerate(graph.nodes):
-#         if xor_state[idx]:
-#             nodes.append(node)
-#     subgraph = nx.subgraph(graph, nodes)
-#     largest_cc = max(nx.connected_components(subgraph), key=len)
-#     return len(largest_cc)
 
 
 def get_state_energy_from_dwave(data: pd.DataFrame, cutoff_energy: float,
@@ -153,7 +131,7 @@ def filter_states_by_energy(states: np.ndarray, energies: np.ndarray, cutoff_ene
     return filtered_states, filtered_energies
 
 
-def find_droplets_hamming(instance_path: str, state_energy_tuple: namedtuple, hamming_cutoff: int, ground_eng: float,
+def find_droplets_hamming(graph: nx.Graph, state_energy_tuple: namedtuple, hamming_cutoff: int, ground_eng: float,
                           energy_cutoff: float, permutation: Optional[list] = None):
     accepted_states = [] 
     accepted_energies = [] 
@@ -165,8 +143,7 @@ def find_droplets_hamming(instance_path: str, state_energy_tuple: namedtuple, ha
     else:
         perm_states = state_energy_tuple.state
         perm_energies = state_energy_tuple.energy
-
-    for idx, state in enumerate(perm_states):
+    for idx, state in tqdm(enumerate(perm_states)):
         if not accepted_states:
             accepted_states.append(state)
             accepted_energies.append(perm_energies[idx])
@@ -174,8 +151,8 @@ def find_droplets_hamming(instance_path: str, state_energy_tuple: namedtuple, ha
             pass
         else:
             h_list = []
-            for (i, drop) in enumerate(accepted_states):
-                h = connected_hamming_dist(state, drop, instance_path)
+            for drop in accepted_states:
+                h = connected_hamming_dist(state, drop, graph)
                 h_list.append(h)
                 eng = (abs(perm_energies[idx] - ground_eng))
             if eng <= energy_cutoff and all(h >= hamming_cutoff for h in h_list):
@@ -185,14 +162,14 @@ def find_droplets_hamming(instance_path: str, state_energy_tuple: namedtuple, ha
 
 
 def find_max_set(iterations: int, state_energy_tuple: namedtuple, hamming_cutoff: int,
-                 ground_eng: float, energy_cutoff: float, instance_path: str):
+                 ground_eng: float, energy_cutoff: float, graph: nx.Graph):
     set_size = 0
     StateEnergy = namedtuple('StateEnergy', ['state', 'energy'])
     permutation = list(range(len(state_energy_tuple.state)))
 
     for i in range(iterations):
         random.shuffle(permutation)
-        accepted_state_energy_tuple = find_droplets_hamming(instance_path, state_energy_tuple, hamming_cutoff,
+        accepted_state_energy_tuple = find_droplets_hamming(graph, state_energy_tuple, hamming_cutoff,
                                                             ground_eng, energy_cutoff, permutation)
         if len(accepted_state_energy_tuple.state) > set_size:
             new_state_energy = StateEnergy(accepted_state_energy_tuple.state, accepted_state_energy_tuple.energy)
@@ -306,10 +283,10 @@ def compute_droplets(path: str, best_found_path: str, instance_path: str, solver
         beta = kwargs["beta"]
         eng = kwargs["eng"]
         bd = kwargs["bd"]
-        result_names, counts, se = compute_droplets_spiglass(path, min_df, beta, eng, bd)
+        result_names, counts, se = compute_droplets_spiglass(path, min_df, instance_path,  beta, eng, bd)
 
     elif solver == "SBM":
-        result_names, counts, se = compute_droplets_sbm(path, best_found_path, min_df)
+        result_names, counts, se = compute_droplets_sbm(path, best_found_path, min_df, instance_path)
 
     elif solver == "PT":
         raise NotImplementedError()
@@ -320,7 +297,7 @@ def compute_droplets(path: str, best_found_path: str, instance_path: str, solver
     return result_names, counts, se
 
 
-def compute_droplets_sbm(path: str, best_found_path: str, min_df: pd.DataFrame):
+def compute_droplets_sbm(path: str, best_found_path: str, min_df: pd.DataFrame, instance_path: str):
     result_names = []
     counts = []
     state_energy = {}
@@ -328,9 +305,11 @@ def compute_droplets_sbm(path: str, best_found_path: str, min_df: pd.DataFrame):
     for name, state_energy_h in tqdm(sbm_states.items()):
         if name not in ["001", "002"]:
             break
+        file_inst = os.path.join(instance_path, name + "_sg.txt")
         ground_eng = min_df[min_df.index == name]['Ground energy'].values[0]
         energy_cutoff = APPROX_RATIO * 2 * np.abs(ground_eng)
-        state_energy_sbm = find_max_set(ITERATIONS, state_energy_h, CUTOFF_HAMMING, ground_eng, energy_cutoff)
+        graph = create_spin_glass_peps_graph(file_inst)
+        state_energy_sbm = find_max_set(ITERATIONS, state_energy_h, CUTOFF_HAMMING, ground_eng, energy_cutoff, graph)
         state_energy[name] = state_energy_sbm
         count = len(state_energy_sbm.energy)
 
@@ -340,7 +319,7 @@ def compute_droplets_sbm(path: str, best_found_path: str, min_df: pd.DataFrame):
     return result_names, counts, state_energy
 
 
-def compute_droplets_spiglass(path: str, min_df: pd.DataFrame, beta: float, eng: float, bd: int):
+def compute_droplets_spiglass(path: str, min_df: pd.DataFrame, instance_path: str, beta: float, eng: float, bd: int):
     result_names = []
     counts = []
     state_energy = {}
@@ -350,9 +329,11 @@ def compute_droplets_spiglass(path: str, min_df: pd.DataFrame, beta: float, eng:
     for name, state_energy_tn in tqdm(spinglass_states.items()):
         if name not in ["001", "002"]:
             break
+        file_inst = os.path.join(instance_path, name + "_sg.txt")
         ground_eng = min_df[min_df.index == name]['Ground energy'].values[0]
         energy_cutoff = APPROX_RATIO * 2 * np.abs(ground_eng)
-        state_energy_sg = find_max_set(ITERATIONS, state_energy_tn, CUTOFF_HAMMING, ground_eng, energy_cutoff)
+        graph = create_spin_glass_peps_graph(file_inst)
+        state_energy_sg = find_max_set(ITERATIONS, state_energy_tn, CUTOFF_HAMMING, ground_eng, energy_cutoff, graph)
         state_energy[name] = state_energy_sg
         count = len(state_energy_sg.energy)
         counts.append(count)
@@ -369,7 +350,7 @@ def compute_droplets_dwave(path: str, min_df: pd.DataFrame, instance_path: str):
     for filename in tqdm(os.listdir(path)):
         file = os.path.join(path, filename)
         name = filename.split(".")[0]
-        file_inst = os.path.join(instance_path, name + ".txt")
+        file_inst = os.path.join(instance_path, name + "_sg.txt")
         if name not in ["001", "002"]:
             continue
         if os.path.isfile(file):
@@ -377,7 +358,8 @@ def compute_droplets_dwave(path: str, min_df: pd.DataFrame, instance_path: str):
             ground_eng = min_df[min_df.index == name]['Ground energy'].values[0]
             state_energy_tuple = get_state_energy_from_dwave(instance_df, CUTOFF_ENERGY, TOPOLOGY_SIZE, ground_eng)
             energy_cutoff = APPROX_RATIO * 2 * np.abs(ground_eng)
-            state_energy_dw = find_max_set(ITERATIONS, state_energy_tuple, CUTOFF_HAMMING, ground_eng, energy_cutoff, file_inst)
+            graph = create_spin_glass_peps_graph(file_inst)
+            state_energy_dw = find_max_set(ITERATIONS, state_energy_tuple, CUTOFF_HAMMING, ground_eng, energy_cutoff, graph)
             state_energy[name] = state_energy_dw
             count = len(state_energy_dw.energy)
             result_names.append(name)
@@ -408,7 +390,6 @@ def count_droplets_in_union(best_found_path: str, state_energy_1: dict, state_en
 
 
 if __name__ == '__main__':
-
 
     result_names_dw, counts_dw, se_dw = compute_droplets(dwave_directory, minimum_path, instance_path, "Dwave")
     # result_names_tn, counts_tn, se_tn = compute_droplets(json_directory, minimum_path, "SpinGlass",
