@@ -31,7 +31,7 @@ from tqdm import tqdm
 
 CUTOFF_ENERGY = 60
 CUTOFF_HAMMING = 100
-ITERATIONS = 1
+ITERATIONS = 10
 APPROX_RATIO = 1e-3
 BETA = 0.5
 ENG = 60
@@ -63,7 +63,7 @@ vector = Union[np.ndarray, list]
 
 def xor(v1: vector, v2: vector) -> vector:
     assert len(v1) == len(v2)
-    return [1 if v1[i] == v2[i] else 0 for i in range(len(v1))]
+    return [0 if v1[i] == v2[i] else 1 for i in range(len(v1))]
 
 
 def hamming_dist(v1: vector, v2: vector) -> int:
@@ -392,9 +392,9 @@ def count_droplets_in_union(best_found_path: str, state_energy_1: dict, state_en
 if __name__ == '__main__':
 
     result_names_dw, counts_dw, se_dw = compute_droplets(dwave_directory, minimum_path, instance_path, "Dwave")
-    # result_names_tn, counts_tn, se_tn = compute_droplets(json_directory, minimum_path, "SpinGlass",
-    #                                               beta=BETA, eng=ENG, bd=BD)
-    # result_names_sbm, counts_sbm, se_sbm = compute_droplets(h5_directory, minimum_path, "SBM")
+    result_names_tn, counts_tn, se_tn = compute_droplets(json_directory, minimum_path, instance_path, "SpinGlass",
+                                                  beta=BETA, eng=ENG, bd=BD)
+    result_names_sbm, counts_sbm, se_sbm = compute_droplets(h5_directory, minimum_path, instance_path, "SBM")
     
     # result_names_dw_tn, union_dw_tn = count_droplets_in_union(minimum_path, se_dw, se_tn)
     # result_names_sbm_tn, union_sbm_tn = count_droplets_in_union(minimum_path, se_sbm, se_tn)
@@ -402,10 +402,10 @@ if __name__ == '__main__':
     
     sorted_results_dw = sorted(zip(result_names_dw, counts_dw), key=lambda x: x[0])
     sorted_names_dw, sorted_values_dw = zip(*sorted_results_dw)
-    # sorted_results_tn = sorted(zip(result_names_tn, counts_tn), key=lambda x: x[0])
-    # sorted_names_tn, sorted_values_tn = zip(*sorted_results_tn)
-    # sorted_results_sb = sorted(zip(result_names_sbm, counts_sbm), key=lambda x: x[0])
-    # sorted_names_sb, sorted_values_sb = zip(*sorted_results_sb)
+    sorted_results_tn = sorted(zip(result_names_tn, counts_tn), key=lambda x: x[0])
+    sorted_names_tn, sorted_values_tn = zip(*sorted_results_tn)
+    sorted_results_sb = sorted(zip(result_names_sbm, counts_sbm), key=lambda x: x[0])
+    sorted_names_sb, sorted_values_sb = zip(*sorted_results_sb)
     
     # sorted_results_dw_tn = sorted(zip(result_names_dw_tn, union_dw_tn), key=lambda x: x[0])
     # sorted_names_dw_tn, sorted_values_dw_tn = zip(*sorted_results_dw_tn)
@@ -415,8 +415,8 @@ if __name__ == '__main__':
     fig1, ax1 = plt.subplots(figsize=(10, 5))
 
     ax1.plot(sorted_names_dw, sorted_values_dw, "ro", label="DW")
-    # ax1.plot(sorted_names_tn, sorted_values_tn, "g*", label="TN, states 1000")
-    # ax1.plot(sorted_names_sb, sorted_values_sb, "bx", label="SB")
+    ax1.plot(sorted_names_tn, sorted_values_tn, "g*", label="TN, states 1000")
+    ax1.plot(sorted_names_sb, sorted_values_sb, "bx", label="SB")
     ax1.legend()
 
     ax1.set_xlabel("Instance index")
