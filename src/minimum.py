@@ -17,15 +17,15 @@ from tqdm import tqdm
 
 # Instance characteristic
 TOPOLOGY = "pegasus"
-INSTANCE_SYMBOL = "P8"
+INSTANCE_SYMBOL = "P4"
 INSTANCE_TYPE = "CBFM-P"
-TOPOLOGY_SIZE = 8
+TOPOLOGY_SIZE = 4
 
 # Directories
 script_dir = os.path.dirname(os.path.abspath(__file__))
 cwd = os.getcwd()
 root = os.path.dirname(script_dir)
-json_directory = os.path.join(root, "droplets", INSTANCE_SYMBOL, INSTANCE_TYPE, f"{INSTANCE_SYMBOL}_beta05_states1000")
+json_directory = os.path.join(root, "droplets", INSTANCE_SYMBOL, INSTANCE_TYPE, "final_bench")
 dwave_directory = os.path.join(root, "energies", f"{TOPOLOGY}_random_aggregated", INSTANCE_SYMBOL, INSTANCE_TYPE)
 sb_directory = os.path.join(root, "energies", "sbm", f"{TOPOLOGY}_random", INSTANCE_SYMBOL, INSTANCE_TYPE,
                             "SpinGlass", "tmp")
@@ -93,7 +93,7 @@ def read_h5_files(directory):
     return instance_data
 
 def calculate_and_create_dataframe(dwave_path, spinglass_path, sb_directory, output_csv):
-    spinglass_states = read_json_data(spinglass_path)
+    # spinglass_states = read_json_data(spinglass_path)
     data_sb = read_h5_files(sb_directory)
 
     result_data = []

@@ -23,7 +23,7 @@ from tqdm import tqdm
 # Constants
 CUTOFF_ENERGY = 6 #10 CBFMP, 6 RAU
 CUTOFF_HAMMING = 27
-ITERATIONS = 7
+ITERATIONS = 11
 APPROX_RATIO = 1e-2
 BETA = 0.5
 ENG = 10 #10 CBFMP, 6 RAU
@@ -137,10 +137,12 @@ def filter_states_by_energy(states: np.ndarray, energies: np.ndarray, cutoff_ene
     return filtered_states, filtered_energies
 
 
-def find_droplets_hamming_connected(graph: nx.Graph, state_energy_tuple: namedtuple, hamming_cutoff: int, ground_eng: float,
-                          energy_cutoff: float, permutation: Optional[list] = None):
-    accepted_states = [] 
-    accepted_energies = [] 
+def find_droplets_hamming_connected(graph: nx.Graph, state_energy_tuple: namedtuple, hamming_cutoff: int,
+                                    ground_eng: float, energy_cutoff: float, permutation: Optional[list] = None,
+                                    checkpoint: Optional[namedtuple] = None):
+    accepted_states = [] if not checkpoint else [list(checkpoint.state[j]) for j in
+                                                 range(len(checkpoint.energy))]
+    accepted_energies = [] if not checkpoint else list(checkpoint.energy)
     AcceptedStateEnergy = namedtuple('AcceptedStateEnergy', ['state', 'energy'])
 
     if permutation is not None:
@@ -213,7 +215,7 @@ def find_droplets_hamming(state_energy_tuple: namedtuple, hamming_cutoff: int, g
 #     # TODO: check edge case
 #     return new_state_energy
 
-def find_max_set_connected(output_directory: str, iterations: int, state_energy_tuple: namedtuple, hamming_cutoff: int,
+def find_max_set_connected(iterations: int, state_energy_tuple: namedtuple, hamming_cutoff: int,
                  ground_eng: float, energy_cutoff: float, graph: nx.Graph, file_path: str):
     set_size = 0
     # print(state_energy_tuple)
@@ -221,30 +223,32 @@ def find_max_set_connected(output_directory: str, iterations: int, state_energy_
     permutation = list(range(len(state_energy_tuple.state)))
     # file_path = os.path.join(output_directory, history_file_name)
     print(file_path)
-    if os.path.isfile(file_path):
+    if os.path.exists(file_path):
         result_df = pd.read_csv(file_path)
         max_iterations_stored = result_df['Iterations'].max()
         
         if max_iterations_stored >= iterations:
             max_iterations_row = result_df[result_df['Iterations'] == iterations]
-            max_state = max_iterations_row['State'].values[0]
-            max_energy = max_iterations_row['Energy'].values[0]
-            new_state_energy = StateEnergy(max_state, max_energy)
+            max_state = np.array(eval(max_iterations_row['State'].values[0]))
+            max_energy = np.array(eval(max_iterations_row['Energy'].values[0]))
+            new_state_energy_tuple = StateEnergy(max_state, max_energy)
         else:
             max_iterations_row = result_df[result_df['Iterations'] == max_iterations_stored]
-            max_state = max_iterations_row['State'].values[0]
-            max_energy = max_iterations_row['Energy'].values[0]
-            new_state_energy = StateEnergy(max_state, max_energy)
+            max_state = np.array(eval(max_iterations_row['State'].values[0]))
+            max_energy = np.array(eval(max_iterations_row['Energy'].values[0]))
+            new_state_energy_tuple = StateEnergy(max_state, max_energy)
             for i in range(max_iterations_stored+1, iterations+1):
                 print(i)
                 random.shuffle(permutation)
-                print(new_state_energy)
-                accepted_state_energy_tuple = find_droplets_hamming_connected(graph, new_state_energy, hamming_cutoff,
-                                                                ground_eng, energy_cutoff, permutation)
+                accepted_state_energy_tuple = find_droplets_hamming_connected(graph, state_energy_tuple, hamming_cutoff,
+                                                                ground_eng, energy_cutoff, permutation, new_state_energy_tuple)
                 set_size = max_iterations_row['Count'].values[0]
                 if len(accepted_state_energy_tuple.state) > set_size:
-                    new_state_energy = StateEnergy(accepted_state_energy_tuple.state, accepted_state_energy_tuple.energy)
-                new_data = {'Iterations': i, 'Energy': [list(accepted_state_energy_tuple.energy)], 'State': [list(accepted_state_energy_tuple.state)], 'Count': len(accepted_state_energy_tuple.energy)}
+                    new_state_energy_tuple = StateEnergy(accepted_state_energy_tuple.state, accepted_state_energy_tuple.energy)
+                new_data = {'Iterations': i, 'Energy': [list(accepted_state_energy_tuple.energy)],
+                            'State': [[list(accepted_state_energy_tuple.state[j])
+                                   for j in range(len(accepted_state_energy_tuple.energy))]],
+                            'Count': len(accepted_state_energy_tuple.energy)}
                 result_df = pd.concat([result_df, pd.DataFrame(new_data)], ignore_index=True)
                 result_df.to_csv(file_path, index=False)
     else:
@@ -254,14 +258,17 @@ def find_max_set_connected(output_directory: str, iterations: int, state_energy_
             accepted_state_energy_tuple = find_droplets_hamming_connected(graph, state_energy_tuple, hamming_cutoff,
                                                                 ground_eng, energy_cutoff, permutation)
             if len(accepted_state_energy_tuple.state) > set_size:
-                new_state_energy = StateEnergy(accepted_state_energy_tuple.state, accepted_state_energy_tuple.energy)
+                new_state_energy_tuple = StateEnergy(accepted_state_energy_tuple.state, accepted_state_energy_tuple.energy)
                 set_size = len(accepted_state_energy_tuple.state)
-            new_data = {'Iterations': i+1, 'Energy': [list(accepted_state_energy_tuple.energy)], 'State': [list(accepted_state_energy_tuple.state)], 'Count': len(accepted_state_energy_tuple.energy)}
+            new_data = {'Iterations': i+1, 'Energy': [list(accepted_state_energy_tuple.energy)],
+                        'State': [[list(accepted_state_energy_tuple.state[j])
+                                   for j in range(len(accepted_state_energy_tuple.energy))]],
+                        'Count': len(accepted_state_energy_tuple.energy)}
             result_df = pd.concat([result_df, pd.DataFrame(new_data)], ignore_index=True)
             result_df.to_csv(file_path, index=False)
     
     # TODO: check edge case
-    return new_state_energy
+    return new_state_energy_tuple
 
 
 def find_max_set(iterations: int, state_energy_tuple: namedtuple, hamming_cutoff: int,
@@ -384,6 +391,9 @@ def compute_droplets(path: str, best_found_path: str, instance_path: str, output
 
     min_df = pd.read_csv(best_found_path, index_col=0)
     min_df.index = min_df.index.map(lambda x: str(x).zfill(3))
+    if not os.path.exists(output_directory):
+        os.makedirs(output_directory)
+        print(f"Folder '{output_directory}' created successfully.")
 
     if solver == "Dwave":
         result_names, counts, se = compute_droplets_dwave(path, min_df, instance_path, metric, output_directory)
@@ -423,9 +433,9 @@ def compute_droplets_sbm(path: str, best_found_path: str, min_df: pd.DataFrame, 
         if metric == "connected":
             file_inst = os.path.join(instance_path, name + "_sg.txt")
             graph = create_spin_glass_peps_graph(file_inst)
-            state_energy_sbm = find_max_set_connected(output_directory, ITERATIONS, state_energy_h, CUTOFF_HAMMING, ground_eng, energy_cutoff, graph)
+            state_energy_sbm = find_max_set_connected(ITERATIONS, state_energy_h, CUTOFF_HAMMING, ground_eng, energy_cutoff, graph)
         else: 
-            state_energy_sbm = find_max_set(output_directory, ITERATIONS, state_energy_h, CUTOFF_HAMMING, ground_eng, energy_cutoff)
+            state_energy_sbm = find_max_set(ITERATIONS, state_energy_h, CUTOFF_HAMMING, ground_eng, energy_cutoff)
 
         state_energy[name] = state_energy_sbm
         count = len(state_energy_sbm.energy)
@@ -457,9 +467,9 @@ def compute_droplets_spiglass(path: str, min_df: pd.DataFrame, instance_path: st
         if metric == "connected":
             file_inst = os.path.join(instance_path, name + "_sg.txt")
             graph = create_spin_glass_peps_graph(file_inst)
-            state_energy_sg = find_max_set_connected(history_directory, ITERATIONS, state_energy_tn, CUTOFF_HAMMING, ground_eng, energy_cutoff, graph, history_file_name)
+            state_energy_sg = find_max_set_connected(ITERATIONS, state_energy_tn, CUTOFF_HAMMING, ground_eng, energy_cutoff, graph, history_file_name)
         else:
-            state_energy_sg = find_max_set(history_directory, ITERATIONS, state_energy_tn, CUTOFF_HAMMING, ground_eng, energy_cutoff)
+            state_energy_sg = find_max_set(ITERATIONS, state_energy_tn, CUTOFF_HAMMING, ground_eng, energy_cutoff)
         state_energy[name] = state_energy_sg
         count = len(state_energy_sg.energy)
         counts.append(count)
