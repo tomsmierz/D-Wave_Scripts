@@ -23,7 +23,7 @@ from tqdm import tqdm
 # Constants
 CUTOFF_ENERGY = 6 #10 CBFMP, 6 RAU
 CUTOFF_HAMMING = 27
-ITERATIONS = 11
+ITERATIONS = 25
 APPROX_RATIO = 1e-2
 BETA = 0.5
 ENG = 10 #10 CBFMP, 6 RAU
@@ -218,11 +218,9 @@ def find_droplets_hamming(state_energy_tuple: namedtuple, hamming_cutoff: int, g
 def find_max_set_connected(iterations: int, state_energy_tuple: namedtuple, hamming_cutoff: int,
                  ground_eng: float, energy_cutoff: float, graph: nx.Graph, file_path: str):
     set_size = 0
-    # print(state_energy_tuple)
     StateEnergy = namedtuple('StateEnergy', ['state', 'energy'])
-    permutation = list(range(len(state_energy_tuple.state)))
-    # file_path = os.path.join(output_directory, history_file_name)
-    print(file_path)
+    permutation = list(range(len(state_energy_tuple.energy)))
+
     if os.path.exists(file_path):
         result_df = pd.read_csv(file_path)
         max_iterations_stored = result_df['Iterations'].max()
@@ -245,10 +243,10 @@ def find_max_set_connected(iterations: int, state_energy_tuple: namedtuple, hamm
                 set_size = max_iterations_row['Count'].values[0]
                 if len(accepted_state_energy_tuple.state) > set_size:
                     new_state_energy_tuple = StateEnergy(accepted_state_energy_tuple.state, accepted_state_energy_tuple.energy)
-                new_data = {'Iterations': i, 'Energy': [list(accepted_state_energy_tuple.energy)],
-                            'State': [[list(accepted_state_energy_tuple.state[j])
-                                   for j in range(len(accepted_state_energy_tuple.energy))]],
-                            'Count': len(accepted_state_energy_tuple.energy)}
+                new_data = {'Iterations': i, 'Energy': [list(new_state_energy_tuple.energy)],
+                            'State': [[list(new_state_energy_tuple.state[j])
+                                   for j in range(len(new_state_energy_tuple.energy))]],
+                            'Count': len(new_state_energy_tuple.energy)}
                 result_df = pd.concat([result_df, pd.DataFrame(new_data)], ignore_index=True)
                 result_df.to_csv(file_path, index=False)
     else:
@@ -260,10 +258,10 @@ def find_max_set_connected(iterations: int, state_energy_tuple: namedtuple, hamm
             if len(accepted_state_energy_tuple.state) > set_size:
                 new_state_energy_tuple = StateEnergy(accepted_state_energy_tuple.state, accepted_state_energy_tuple.energy)
                 set_size = len(accepted_state_energy_tuple.state)
-            new_data = {'Iterations': i+1, 'Energy': [list(accepted_state_energy_tuple.energy)],
-                        'State': [[list(accepted_state_energy_tuple.state[j])
-                                   for j in range(len(accepted_state_energy_tuple.energy))]],
-                        'Count': len(accepted_state_energy_tuple.energy)}
+            new_data = {'Iterations': i+1, 'Energy': [list(new_state_energy_tuple.energy)],
+                        'State': [[list(new_state_energy_tuple.state[j])
+                                   for j in range(len(new_state_energy_tuple.energy))]],
+                        'Count': len(new_state_energy_tuple.energy)}
             result_df = pd.concat([result_df, pd.DataFrame(new_data)], ignore_index=True)
             result_df.to_csv(file_path, index=False)
     
