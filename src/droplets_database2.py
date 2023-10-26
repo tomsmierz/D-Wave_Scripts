@@ -26,7 +26,7 @@ CUTOFF_HAMMING = 27
 ITERATIONS = 25
 APPROX_RATIO = 1e-2
 BETA = 0.5
-ENG = 10 #10 CBFMP, 6 RAU
+ENG = 6 #10 CBFMP, 6 RAU
 BD = 4
 BD1 = 8 
 BD2 = 12
@@ -46,7 +46,7 @@ MAX_STATES2 = 1024
 # Instance characteristic
 TOPOLOGY = "pegasus"
 INSTANCE_SYMBOL = "P4"
-INSTANCE_TYPE = "CBFM-P"
+INSTANCE_TYPE = "RAU"
 TOPOLOGY_SIZE = 4
 
 # Directories
@@ -197,24 +197,6 @@ def find_droplets_hamming(state_energy_tuple: namedtuple, hamming_cutoff: int, g
                 accepted_energies.append(perm_energies[idx])
     return AcceptedStateEnergy(np.array(accepted_states), np.array(accepted_energies))
 
-
-
-# def find_max_set_connected(iterations: int, state_energy_tuple: namedtuple, hamming_cutoff: int,
-#                  ground_eng: float, energy_cutoff: float, graph: nx.Graph):
-#     set_size = 0
-#     StateEnergy = namedtuple('StateEnergy', ['state', 'energy'])
-#     permutation = list(range(len(state_energy_tuple.state)))
-
-#     for i in range(iterations):
-#         random.shuffle(permutation)
-#         accepted_state_energy_tuple = find_droplets_hamming_connected(graph, state_energy_tuple, hamming_cutoff,
-#                                                             ground_eng, energy_cutoff, permutation)
-#         if len(accepted_state_energy_tuple.state) > set_size:
-#             new_state_energy = StateEnergy(accepted_state_energy_tuple.state, accepted_state_energy_tuple.energy)
-#             set_size = len(accepted_state_energy_tuple.state)
-#     # TODO: check edge case
-#     return new_state_energy
-
 def find_max_set_connected(iterations: int, state_energy_tuple: namedtuple, hamming_cutoff: int,
                  ground_eng: float, energy_cutoff: float, graph: nx.Graph, file_path: str):
     set_size = 0
@@ -270,20 +252,59 @@ def find_max_set_connected(iterations: int, state_energy_tuple: namedtuple, hamm
 
 
 def find_max_set(iterations: int, state_energy_tuple: namedtuple, hamming_cutoff: int,
-                 ground_eng: float, energy_cutoff: float):
+                 ground_eng: float, energy_cutoff: float, file_path: str):
     set_size = 0
     StateEnergy = namedtuple('StateEnergy', ['state', 'energy'])
-    permutation = list(range(len(state_energy_tuple.state)))
+    permutation = list(range(len(state_energy_tuple.energy)))
 
-    for i in range(iterations):
-        random.shuffle(permutation)
-        accepted_state_energy_tuple = find_droplets_hamming(state_energy_tuple, hamming_cutoff,
-                                                            ground_eng, energy_cutoff, permutation)
-        if len(accepted_state_energy_tuple.state) > set_size:
-            new_state_energy = StateEnergy(accepted_state_energy_tuple.state, accepted_state_energy_tuple.energy)
-            set_size = len(accepted_state_energy_tuple.state)
+    if os.path.exists(file_path):
+        result_df = pd.read_csv(file_path)
+        max_iterations_stored = result_df['Iterations'].max()
+        
+        if max_iterations_stored >= iterations:
+            max_iterations_row = result_df[result_df['Iterations'] == iterations]
+            max_state = np.array(eval(max_iterations_row['State'].values[0]))
+            max_energy = np.array(eval(max_iterations_row['Energy'].values[0]))
+            new_state_energy_tuple = StateEnergy(max_state, max_energy)
+        else:
+            max_iterations_row = result_df[result_df['Iterations'] == max_iterations_stored]
+            max_state = np.array(eval(max_iterations_row['State'].values[0]))
+            max_energy = np.array(eval(max_iterations_row['Energy'].values[0]))
+            new_state_energy_tuple = StateEnergy(max_state, max_energy)
+            for i in range(max_iterations_stored+1, iterations+1):
+                print(i)
+                random.shuffle(permutation)
+                accepted_state_energy_tuple = find_droplets_hamming(state_energy_tuple, hamming_cutoff,
+                                                                ground_eng, energy_cutoff, permutation, new_state_energy_tuple)
+                set_size = max_iterations_row['Count'].values[0]
+                if len(accepted_state_energy_tuple.state) > set_size:
+                    new_state_energy_tuple = StateEnergy(accepted_state_energy_tuple.state, accepted_state_energy_tuple.energy)
+                new_data = {'Iterations': i, 'Energy': [list(new_state_energy_tuple.energy)],
+                            'State': [[list(new_state_energy_tuple.state[j])
+                                   for j in range(len(new_state_energy_tuple.energy))]],
+                            'Count': len(new_state_energy_tuple.energy)}
+                result_df = pd.concat([result_df, pd.DataFrame(new_data)], ignore_index=True)
+                result_df.to_csv(file_path, index=False)
+    else:
+        result_df = pd.DataFrame(columns=['Iterations', 'Count', 'Energy', 'State'])
+        for i in range(iterations):
+            random.shuffle(permutation)
+            accepted_state_energy_tuple = find_droplets_hamming_connected(     state_energy_tuple, hamming_cutoff,
+                                                                ground_eng, energy_cutoff, permutation)
+            if len(accepted_state_energy_tuple.state) > set_size:
+                new_state_energy_tuple = StateEnergy(accepted_state_energy_tuple.state, accepted_state_energy_tuple.energy)
+                set_size = len(accepted_state_energy_tuple.state)
+            new_data = {'Iterations': i+1, 'Energy': [list(new_state_energy_tuple.energy)],
+                        'State': [[list(new_state_energy_tuple.state[j])
+                                   for j in range(len(new_state_energy_tuple.energy))]],
+                        'Count': len(new_state_energy_tuple.energy)}
+            result_df = pd.concat([result_df, pd.DataFrame(new_data)], ignore_index=True)
+            result_df.to_csv(file_path, index=False)
+    
     # TODO: check edge case
-    return new_state_energy
+    return new_state_energy_tuple
+
+
 
 
 def create_union(states1: namedtuple, states2: namedtuple):
@@ -384,8 +405,8 @@ def read_json_files(directory, beta, eng, bd, ms, cutoff_energy, df_min) -> dict
 
 
 def compute_droplets(path: str, best_found_path: str, instance_path: str, output_directory: str, solver: Optional[str], metric: Optional[str], **kwargs):
-    if solver not in ["Dwave", "SpinGlass", "SBM", "PT", None]:
-        raise ValueError("Solver should be \"Dwave\", \"SpinGlass\", \"SBM\", \"PT\" or None")
+    if solver not in ["DWave", "SpinGlass", "SBM", "PT", None]:
+        raise ValueError("Solver should be \"DWave\", \"SpinGlass\", \"SBM\", \"PT\" or None")
 
     min_df = pd.read_csv(best_found_path, index_col=0)
     min_df.index = min_df.index.map(lambda x: str(x).zfill(3))
@@ -393,7 +414,7 @@ def compute_droplets(path: str, best_found_path: str, instance_path: str, output
         os.makedirs(output_directory)
         print(f"Folder '{output_directory}' created successfully.")
 
-    if solver == "Dwave":
+    if solver == "DWave":
         result_names, counts, se = compute_droplets_dwave(path, min_df, instance_path, metric, output_directory)
 
     elif solver == "SpinGlass":
@@ -418,7 +439,7 @@ def compute_droplets(path: str, best_found_path: str, instance_path: str, output
     return result_names, counts, se
 
 
-def compute_droplets_sbm(path: str, best_found_path: str, min_df: pd.DataFrame, instance_path: str, metric: Optional[str], output_directory):
+def compute_droplets_sbm(path: str, best_found_path: str, min_df: pd.DataFrame, instance_path: str, metric: Optional[str], history_directory):
     result_names = []
     counts = []
     state_energy = {}
@@ -426,14 +447,16 @@ def compute_droplets_sbm(path: str, best_found_path: str, min_df: pd.DataFrame, 
     for name, state_energy_h in tqdm(sbm_states.items()):
         if name not in ["001", "002", "003", "004", "005"]:
             break
+        instance_parameters = f"_{metric}_SBM"
+        history_file_name = os.path.join(history_directory, f"{name}{instance_parameters}.csv")
         ground_eng = min_df[min_df.index == name]['Ground energy'].values[0]
         energy_cutoff = APPROX_RATIO * 2 * np.abs(ground_eng)
         if metric == "connected":
             file_inst = os.path.join(instance_path, name + "_sg.txt")
             graph = create_spin_glass_peps_graph(file_inst)
-            state_energy_sbm = find_max_set_connected(ITERATIONS, state_energy_h, CUTOFF_HAMMING, ground_eng, energy_cutoff, graph)
-        else: 
-            state_energy_sbm = find_max_set(ITERATIONS, state_energy_h, CUTOFF_HAMMING, ground_eng, energy_cutoff)
+            state_energy_sbm = find_max_set_connected(ITERATIONS, state_energy_h, CUTOFF_HAMMING, ground_eng, energy_cutoff, graph, history_file_name)
+        else:
+            state_energy_sbm = find_max_set(ITERATIONS, state_energy_h, CUTOFF_HAMMING, ground_eng, energy_cutoff, history_file_name)
 
         state_energy[name] = state_energy_sbm
         count = len(state_energy_sbm.energy)
@@ -454,12 +477,8 @@ def compute_droplets_spiglass(path: str, min_df: pd.DataFrame, instance_path: st
     for name, state_energy_tn in tqdm(spinglass_states.items()):
         if name not in ["001", "002", "003", "004", "005"]:
             break
-        # if solver == "SpinGlass":
         instance_parameters = f"_beta{beta}_eng{eng}_bd{bd}_ms{ms}_{metric}_SpinGlass"
-        # else:
-        #     instance_parameters = f"_{metric}_{solver}"
         history_file_name = os.path.join(history_directory, f"{name}{instance_parameters}.csv")
-        print(history_file_name)
         ground_eng = min_df[min_df.index == name]['Ground energy'].values[0]
         energy_cutoff = APPROX_RATIO * 2 * np.abs(ground_eng)
         if metric == "connected":
@@ -467,7 +486,7 @@ def compute_droplets_spiglass(path: str, min_df: pd.DataFrame, instance_path: st
             graph = create_spin_glass_peps_graph(file_inst)
             state_energy_sg = find_max_set_connected(ITERATIONS, state_energy_tn, CUTOFF_HAMMING, ground_eng, energy_cutoff, graph, history_file_name)
         else:
-            state_energy_sg = find_max_set(ITERATIONS, state_energy_tn, CUTOFF_HAMMING, ground_eng, energy_cutoff)
+            state_energy_sg = find_max_set(ITERATIONS, state_energy_tn, CUTOFF_HAMMING, ground_eng, energy_cutoff, history_file_name)
         state_energy[name] = state_energy_sg
         count = len(state_energy_sg.energy)
         counts.append(count)
@@ -476,7 +495,7 @@ def compute_droplets_spiglass(path: str, min_df: pd.DataFrame, instance_path: st
     return result_names, counts, state_energy
 
 
-def compute_droplets_dwave(path: str, min_df: pd.DataFrame, instance_path: str, metric: Optional[str], output_directory):
+def compute_droplets_dwave(path: str, min_df: pd.DataFrame, instance_path: str, metric: Optional[str], history_directory):
     result_names = []
     counts = []
     state_energy = {}
@@ -489,14 +508,17 @@ def compute_droplets_dwave(path: str, min_df: pd.DataFrame, instance_path: str, 
         if os.path.isfile(file):
             instance_df = pd.read_csv(file, index_col=0)
             ground_eng = min_df[min_df.index == name]['Ground energy'].values[0]
+            instance_parameters = f"_{metric}_DWave"
+            history_file_name = os.path.join(history_directory, f"{name}{instance_parameters}.csv")
             state_energy_tuple = get_state_energy_from_dwave(instance_df, CUTOFF_ENERGY, TOPOLOGY_SIZE, ground_eng)
             energy_cutoff = APPROX_RATIO * 2 * np.abs(ground_eng)
-            if metric == "connected":
-                file_inst = os.path.join(instance_path, name + "_sg.txt")
-                graph = create_spin_glass_peps_graph(file_inst)
-                state_energy_dw = find_max_set_connected(output_directory, ITERATIONS, state_energy_tuple, CUTOFF_HAMMING, ground_eng, energy_cutoff, graph)
-            else:
-                state_energy_dw = find_max_set(output_directory, ITERATIONS, state_energy_tuple, CUTOFF_HAMMING, ground_eng, energy_cutoff)
+        if metric == "connected":
+            file_inst = os.path.join(instance_path, name + "_sg.txt")
+            graph = create_spin_glass_peps_graph(file_inst)
+            state_energy_dw = find_max_set_connected(ITERATIONS, state_energy_tuple, CUTOFF_HAMMING, ground_eng, energy_cutoff, graph, history_file_name)
+        else:
+            state_energy_dw = find_max_set(ITERATIONS, state_energy_tuple, CUTOFF_HAMMING, ground_eng, energy_cutoff, history_file_name)
+
             state_energy[name] = state_energy_dw
             count = len(state_energy_dw.energy)
             result_names.append(name)
@@ -530,61 +552,11 @@ def count_droplets_in_union(best_found_path: str, state_energy_1: dict, state_en
     return result_names, counts
 
 
-def plot_instance_vs_count(output_directory):
-    # Collect data from all CSV files in the output directory
-    all_data = []
-    names = []
-    iterations = []
-    for filename in os.listdir(output_directory):
-        if filename.endswith(".csv"):
-            name_parts = filename.split("_")
-            name = name_parts[0]
-            iteration = name_parts[1][4:]  # Extract iteration number
-            instance_df = pd.read_csv(os.path.join(output_directory, filename))
-            all_data.append(instance_df)
-            names.append(name)
-            iterations.append(iteration)
-
-    if all_data:
-        plt.figure(figsize=(10, 6))
-        unique_iterations = set(iterations)
-        
-        markers = ['o', 's', 'D', 'v', '^']  # Add more if needed
-        colors = ['b', 'g', 'r', 'c', 'm']   # Add more if needed
-
-        marker_color_dict = dict(zip(unique_iterations, zip(markers, colors)))
-        
-        legend_labels = []
-
-        for iteration in unique_iterations:
-            iteration_data = [data for i, data in enumerate(all_data) if iterations[i] == iteration]
-            iteration_names = [name for i, name in enumerate(names) if iterations[i] == iteration]
-
-            # Sort data and names based on instance names
-            sorted_data = sorted(zip(iteration_names, iteration_data), key=lambda x: x[0])
-            sorted_names, sorted_df = zip(*sorted_data)
-            marker, color = marker_color_dict[iteration]  # Get marker and color for this iteration
-            label = f"Iteration {iteration}"
-
-            for i, instance_df in enumerate(sorted_df):
-                plt.plot(sorted_names[i], instance_df['Count'][0], marker, color=color, label=label)
-            
-            # Create a custom legend label with marker and color
-            legend_labels.append(plt.Line2D([0], [0], marker=marker, color=color, label=label))
-
-        plt.xlabel("Instance")
-        plt.ylabel("Count")
-        plt.title("Instance vs. Count")
-        plt.legend(handles=legend_labels, title="Iterations")
-        plt.xticks(rotation=45)
-        plt.tight_layout()
-        plt.savefig(os.path.join(output_directory, "instance_vs_count.png"))
-
 if __name__ == '__main__':
 
-    # result_names_dw, counts_dw, se_dw = compute_droplets(dwave_directory, minimum_path, instance_path, output_directory, "DWave", "connected")
-    result_names_tn, counts_tn, se_tn = compute_droplets(json_directory, minimum_path, instance_path, output_directory, "SpinGlass", "connected",
-                                            beta=BETA, eng=ENG, bd=BD, ms=MAX_STATES)
+    result_names_dw, counts_dw, se_dw = compute_droplets(dwave_directory, minimum_path, instance_path, output_directory, "DWave", "connected")
+    # result_names_tn, counts_tn, se_tn = compute_droplets(json_directory, minimum_path, instance_path, output_directory, "SpinGlass", "connected",
+                                            # beta=BETA, eng=ENG, bd=BD, ms=MAX_STATES)
     # result_names_sbm, counts_sbm, se_sbm = compute_droplets(h5_directory, minimum_path, instance_path, output_directory, "SBM", "connected")
 
     # plot_instance_vs_count(output_directory)
