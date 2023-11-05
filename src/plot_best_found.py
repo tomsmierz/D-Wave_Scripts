@@ -8,23 +8,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Constants
-CUTOFF_ENERGY = 6 #10 CBFMP, 6 RAU
-CUTOFF_HAMMING = 27
-ITERATIONS = 25
-APPROX_RATIO = 1e-2
 BETA = 0.5
-ENG = 6 #10 CBFMP, 6 RAU
-BD = 4
-BD1 = 8 
-BD2 = 12
-MAX_STATES = 64
-MAX_STATES1 = 256
-MAX_STATES2 = 1024
 
 # Instance characteristic
 TOPOLOGY = "pegasus"
 INSTANCE_SYMBOL = "P4"
-INSTANCE_TYPE = "CBFM-P"
+INSTANCE_TYPE = "RAU"
 TOPOLOGY_SIZE = 4
 
 # Directories
@@ -35,9 +24,7 @@ json_directory = os.path.join(root, "droplets", INSTANCE_SYMBOL, INSTANCE_TYPE, 
 dwave_directory = os.path.join(root, "energies", f"{TOPOLOGY}_random_aggregated", INSTANCE_SYMBOL, INSTANCE_TYPE)
 h5_directory = os.path.join(root, "energies", "sbm", f"{TOPOLOGY}_random", INSTANCE_SYMBOL, INSTANCE_TYPE,
                             "SpinGlass", "tmp")
-instance_path = os.path.join(root, "instances", f"{TOPOLOGY}_random", INSTANCE_SYMBOL, INSTANCE_TYPE)
-output_directory = os.path.join(root, "droplets", INSTANCE_SYMBOL, INSTANCE_TYPE, "results")
-
+output_csv = os.path.join(root, "droplets", INSTANCE_SYMBOL, INSTANCE_TYPE, "minimum.csv")
 
 def lowest_tn(folder_path):
     lowest_energy = {}
@@ -66,14 +53,13 @@ def lowest_dw(folder_path):
                 csv_reader = csv.reader(file)
                 for row in csv_reader:
                     try:
-                        energy = float(row[-2])  # Assuming the energy is in the penultimate column
+                        energy = float(row[-6])
                         if instance in lowest_energy:
                             if energy < lowest_energy[instance]:
                                 lowest_energy[instance] = energy
                         else:
                             lowest_energy[instance] = energy
                     except (ValueError, IndexError):
-                        # Handle cases where energy value is not a valid float or the row lacks the expected number of columns
                         pass
     return lowest_energy
 
@@ -81,22 +67,26 @@ def lowest_dw(folder_path):
 def lowest_sbm(folder_path):
     lowest_energy = {}
     for filename in os.listdir(folder_path):
-        if filename.endswith('.h5'):
-            f = h5py.File(filename, "r")
-            instance = filename.split("_")[0]
-            energy = f['Spectrum']['energies'][0]
-            lowest_energy[instance] = energy
+        file = os.path.join(folder_path, filename)
+        if os.path.isfile(file):
+            file_extension = os.path.splitext(filename)[-1].lower()
+            if file_extension == ".h5":
+                f = h5py.File(file, "r")
+                instance_name = filename.split("_")[0]
+                instance = filename.split("_")[0]
+                energy = f['Spectrum']['energies'][0]
+                lowest_energy[instance] = energy
     return lowest_energy
 
 
-def find_lowest_energy(instances_tn, instances_dw, instances_sbm):
+def find_lowest_energy(instances_tn, instances_dw, instances_sbm, output_csv):
     data_tn = lowest_tn(instances_tn)
     data_dw = lowest_dw(instances_dw)
-    data_sbm = lowest_dw(instances_sbm)
-
+    # data_sbm = lowest_sbm(instances_sbm)
     lowest_energy = {} 
 
-    all_instances_data = {**data_tn, **data_dw, **data_sbm}
+    all_instances_data = {**data_tn, **data_dw}
+    # all_instances_data = {**data_tn, **data_dw, **data_sbm}
 
     for instance, energy in all_instances_data.items():
         if instance in data_tn.keys():
@@ -106,12 +96,17 @@ def find_lowest_energy(instances_tn, instances_dw, instances_sbm):
             else:
                 lowest_energy[instance] = energy
 
+    data_list = [[instance, energy] for instance, energy in lowest_energy.items()]
+    df = pd.DataFrame(data_list, columns=["Instance", "Energy"])
+    df_sorted = df.sort_values(by="Instance")
+    df_sorted.to_csv(output_csv, index=False)
+    
     return lowest_energy, data_tn
 
-def plot_instance_energy(instances_tn, instances_dw, instances_sbm):
-    lowest_energy, data_tn = find_lowest_energy(instances_tn, instances_dw, instances_sbm)
 
-    # Sort the dictionaries by instance name
+def plot_instance_energy(instances_tn, instances_dw, instances_sbm, output_csv):
+    lowest_energy, data_tn = find_lowest_energy(instances_tn, instances_dw, instances_sbm, output_csv)
+
     sorted_lowest_energy = dict(sorted(lowest_energy.items()))
     sorted_data_tn = dict(sorted(data_tn.items()))
 
@@ -119,24 +114,22 @@ def plot_instance_energy(instances_tn, instances_dw, instances_sbm):
     energies_best = list(sorted_lowest_energy.values())
     energies_tn = list(sorted_data_tn.values())
 
-
-    # Calculate the normalized differences
     normalized_differences = [
-        (data_tn - best_energy) / abs(best_energy) if best_energy is not None else None
+        (data_tn - best_energy) / (2*abs(best_energy)) if best_energy is not None else None
         for best_energy, data_tn in zip(energies_best, energies_tn)
     ]
     
-    print(normalized_differences)
     plt.figure(figsize=(10, 6))
     plt.axhline(0, color='red', linestyle='--')  # Add a red horizontal line at y=0
     plt.plot(instances, normalized_differences, 'bo')
     plt.xlabel("Instance Name")
-    plt.ylabel("(Energies_TN - Energies_best) / |Energies_best|")
-    plt.title("Normalized Energy Differences")
+    plt.ylabel("(Energies_TN - Energies_best) / (2*|Energies_best|)")
+    plt.title(f"{INSTANCE_SYMBOL}, {INSTANCE_TYPE}, beta={BETA}")
+
     plt.xticks(rotation=45)
     plt.tight_layout()
     plt.show()
     
     
 if __name__ == '__main__':
-    plot_instance_energy(json_directory, dwave_directory, h5_directory)
+    plot_instance_energy(json_directory, dwave_directory, h5_directory, output_csv)
