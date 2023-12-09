@@ -137,10 +137,13 @@ def filter_states_by_energy(states: np.ndarray, energies: np.ndarray, cutoff_ene
     """
     states: Expected to be square matrix, with states in rows
     """
-    mask = energies <= ground_eng + cutoff_energy
-    filtered_states = states[mask]
-    filtered_energies = energies[mask]
-    return filtered_states, filtered_energies
+    if cutoff_energy == 0:
+        return states, energies
+    else:
+        mask = energies <= ground_eng + cutoff_energy
+        filtered_states = states[mask]
+        filtered_energies = energies[mask]
+        return filtered_states, filtered_energies
 
 
 def find_droplets_hamming_connected(graph: nx.Graph, state_energy_tuple: namedtuple, hamming_cutoff: int,
@@ -321,8 +324,7 @@ def array_from_dict(dict_list):
             result_array[i, int(key) - 1] = value
     return result_array
 
-
-def read_h5_files(directory, df_min):
+def read_h5_files(directory, df_min, approx_ratio):
     instance_data = {}
     for filename in os.listdir(directory):
         file = os.path.join(directory, filename)
@@ -332,25 +334,26 @@ def read_h5_files(directory, df_min):
             if file_extension == ".h5":
                 f = h5py.File(file, "r")
                 instance_name = filename.split("_")[0]
-                if instance_name not in ["001", "002", "003", "004", "005"]:
+                name_range = [f"{i:03d}" for i in range(1, 21)]
+                if instance_name not in name_range:
                     continue
                 energies = f['Spectrum']['energies']
                 states = f['Spectrum']["states"]
                 ground_eng = df_min[df_min.index == instance_name]['Energy'].values[0]
                 # ground_eng = energies[0]
-                energy_cutoff = APPROX_RATIO * 2 * np.abs(ground_eng)
+                energy_cutoff = approx_ratio * 2 * np.abs(ground_eng)
                 filtered_states, filtered_energies = filter_states_by_energy(states, energies,
                                                                              energy_cutoff, ground_eng)
                 instance_data[instance_name] = StateEnergy(filtered_states, filtered_energies)
     return instance_data
 
 
-def read_json_files(directory, beta, eng, bd, ms, df_min) -> dict:
+def read_json_files(directory, beta, eng, bd, ms, df_min, approx_ratio) -> dict:
     instance_data = {}
     for filename in os.listdir(directory):
         file = os.path.join(directory, filename)
         StateEnergy = namedtuple('StateEnergy', ['state', 'energy'])
-        if os.path.isfile(file):
+        if os.path.isfile(file) and file.endswith(".json"):
             with open(file, encoding='utf-8') as f:
                 json_data = json.load(f)
                 if json_data['columns'][json_data['colindex']['lookup']['β']-1][0] == beta and \
@@ -363,7 +366,7 @@ def read_json_files(directory, beta, eng, bd, ms, df_min) -> dict:
                     state_data_np = array_from_dict(state_data)
                     energy_data_np = np.array(energy_data)
                     ground_eng = df_min[df_min.index == instance_name]['Energy'].values[0]
-                    energy_cutoff = APPROX_RATIO * 2 * np.abs(ground_eng)
+                    energy_cutoff = approx_ratio * 2 * np.abs(ground_eng)
                     filtered_states, filtered_energies = filter_states_by_energy(state_data_np, energy_data_np, energy_cutoff, ground_eng)
 
                     if instance_name in instance_data:
@@ -419,9 +422,10 @@ def compute_droplets_sbm(path: str, best_found_path: str, min_df: pd.DataFrame, 
     result_names = []
     counts = []
     state_energy = {}
-    sbm_states = read_h5_files(path, min_df)
+    sbm_states = read_h5_files(path, min_df, APPROX_RATIO)
     for name, state_energy_h in tqdm(sbm_states.items()):
-        if name not in ["001", "002", "003", "004", "005"]:
+        name_range = [f"{i:03d}" for i in range(1, 21)]
+        if name not in name_range:
             continue
         ground_eng = min_df[min_df.index == name]['Energy'].values[0]
         instance_parameters = f"_best{ground_eng}_{metric}_SBM"
@@ -448,10 +452,11 @@ def compute_droplets_spiglass(path: str, min_df: pd.DataFrame, instance_path: st
     counts = []
     state_energy = {}
 
-    spinglass_states = read_json_files(path, beta, eng, bd, ms, min_df)
+    spinglass_states = read_json_files(path, beta, eng, bd, ms, min_df, APPROX_RATIO)
 
     for name, state_energy_tn in tqdm(spinglass_states.items()):
-        if name not in ["001", "002", "003", "004", "005"]:
+        name_range = [f"{i:03d}" for i in range(1, 21)]
+        if name not in name_range:
             continue
         ground_eng = min_df[min_df.index == name]['Energy'].values[0]
         instance_parameters = f"_beta{beta}_eng{eng}_bd{bd}_ms{ms}_best{ground_eng}_{metric}_SpinGlass"
@@ -479,7 +484,8 @@ def compute_droplets_dwave(path: str, min_df: pd.DataFrame, instance_path: str, 
     for filename in tqdm(os.listdir(path)):
         file = os.path.join(path, filename)
         name = filename.split(".")[0]
-        if name not in ["001", "002", "003", "004", "005"]:
+        name_range = [f"{i:03d}" for i in range(1, 21)]
+        if name not in name_range:
             continue
         if os.path.isfile(file):
             instance_df = pd.read_csv(file, index_col=0)

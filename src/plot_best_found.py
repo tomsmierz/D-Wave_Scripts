@@ -12,19 +12,19 @@ BETA = 0.5
 
 # Instance characteristic
 TOPOLOGY = "pegasus"
-INSTANCE_SYMBOL = "P4"
-INSTANCE_TYPE = "RAU"
-TOPOLOGY_SIZE = 4
+INSTANCE_SYMBOL = "P8"
+INSTANCE_TYPE = "RCO"
+TOPOLOGY_SIZE = 8
 
 # Directories
 script_dir = os.path.dirname(os.path.abspath(__file__))
 cwd = os.getcwd()
 root = os.path.dirname(script_dir)
-json_directory = os.path.join(root, "droplets", INSTANCE_SYMBOL, INSTANCE_TYPE, "final_bench")
+json_directory = os.path.join(root, "droplets", INSTANCE_SYMBOL, INSTANCE_TYPE, "final_bench_truncate2^16")
 dwave_directory = os.path.join(root, "energies", f"{TOPOLOGY}_random_aggregated", INSTANCE_SYMBOL, INSTANCE_TYPE)
 h5_directory = os.path.join(root, "energies", "sbm", f"{TOPOLOGY}_random", INSTANCE_SYMBOL, INSTANCE_TYPE,
                             "SpinGlass", "tmp")
-output_csv = os.path.join(root, "droplets", INSTANCE_SYMBOL, INSTANCE_TYPE, "minimum.csv")
+output_csv = os.path.join(root, "droplets", INSTANCE_SYMBOL, INSTANCE_TYPE, "minimum_truncated2^16.csv")
 
 def lowest_tn(folder_path):
     lowest_energy = {}
@@ -48,7 +48,7 @@ def lowest_dw(folder_path):
     for filename in os.listdir(folder_path):
         if filename.endswith('.csv'):
             file_path = os.path.join(folder_path, filename)
-            instance = filename.split('_')[0] 
+            instance = filename.split('.')[0] 
             with open(file_path, 'r') as file:
                 csv_reader = csv.reader(file)
                 for row in csv_reader:
@@ -124,7 +124,7 @@ def plot_instance_energy(instances_tn, instances_dw, instances_sbm, output_csv):
     plt.plot(instances, normalized_differences, 'bo')
     plt.xlabel("Instance Name")
     plt.ylabel("(Energies_TN - Energies_best) / (2*|Energies_best|)")
-    plt.title(f"{INSTANCE_SYMBOL}, {INSTANCE_TYPE}, beta={BETA}")
+    plt.title(f"{INSTANCE_SYMBOL}, {INSTANCE_TYPE}")
 
     plt.xticks(rotation=45)
     plt.tight_layout()
