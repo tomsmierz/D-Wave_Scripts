@@ -62,7 +62,7 @@ def draw_instance(df, file, scale):
         edges = nx.draw_networkx_edges(graph, pos, edge_color=J.values(), edge_cmap=plt.cm.bwr_r, edge_vmin=-1, edge_vmax=1)
         cbar = plt.colorbar(edges, cax=plt.gcf().add_axes([0.87, 0.2, 0.03, 0.6]))
         cbar.ax.tick_params(labelsize=15)
-        cbar.ax.set_title('J_ij', fontsize=20)
+        cbar.ax.set_title(r'$J_{ij}$', fontsize=20)
         plt.show()
         
             
