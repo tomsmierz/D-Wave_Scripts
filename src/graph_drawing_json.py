@@ -6,15 +6,20 @@ import numpy as np
 from numpy import random
 import json
 from matplotlib.colors import ListedColormap
+import matplotlib.font_manager as font_manager
 
+# Ustawienie Times New Roman jako czcionki
+plt.rcParams['font.family'] = 'Times New Roman'
 
 rng = random.default_rng()
 
 root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-df = pd.read_csv(os.path.join(root, "instances", "example", "diagonal_5x5.txt"), header=None, sep=" ",
+df = pd.read_csv(os.path.join(root, "instances", "example", "diagonal_2x2.txt"), header=None, sep=" ",
                 names=["n1", "n2", "v"])
-file = os.path.join(root, "energies", "example", "diagonal5x5droplets", "6426090948207743555.json")
+file = os.path.join(root, "energies", "example", "diagonal2x2droplets", "893828145515343863.json")
+# file = os.path.join(root, "energies", "example", "diagonal5x5droplets", "6426090948207743555.json")
+
 scale = 7
 
 def load_dict(f):
@@ -58,11 +63,13 @@ def draw_instance(df, file, scale):
             cluster_center = cluster
             cluster_pos = nx.circular_layout(range(len(spins)))
             pos.update({spin: (cluster_center[0] + cluster_pos[i][0]/scale, cluster_center[1] + cluster_pos[i][1]/scale) for i, spin in enumerate(spins)})
-            nx.draw_networkx_nodes(graph, pos, nodelist=spins, node_color='black', node_size=50)
+            nx.draw_networkx_nodes(graph, pos, nodelist=spins, node_color='black', node_size=200)
         edges = nx.draw_networkx_edges(graph, pos, edge_color=J.values(), edge_cmap=plt.cm.bwr_r, edge_vmin=-1, edge_vmax=1)
-        cbar = plt.colorbar(edges, cax=plt.gcf().add_axes([0.87, 0.2, 0.03, 0.6]))
-        cbar.ax.tick_params(labelsize=15)
-        cbar.ax.set_title(r'$J_{ij}$', fontsize=20)
+        # edges = nx.draw_networkx_edges(graph, pos, edge_color='grey')
+
+        cbar = plt.colorbar(edges, cax=plt.gcf().add_axes([0.86, 0.2, 0.03, 0.6]))
+        cbar.ax.tick_params(labelsize=40)
+        cbar.ax.set_title('$J_{ij}$', fontsize=50, fontname='Times New Roman')
         plt.show()
         
             
@@ -151,5 +158,5 @@ def draw_droplet(df, file, scale):
 
 if __name__ == '__main__':
     draw_instance(df, file, scale)
-    draw_solution(df, file, scale)
-    draw_droplet(df, file, scale)
+    # draw_solution(df, file, scale)
+    # draw_droplet(df, file, scale)
