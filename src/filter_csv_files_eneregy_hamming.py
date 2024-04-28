@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 from tqdm import tqdm
 from renumeration import advantage_6_1_to_spinglass, advantage_6_1_to_spinglass_int
-from droplets_database import get_state_energy_from_dwave
+from read_data import get_state_energy_from_dwave
 
 TOPOLOGY = "pegasus"
 INSTANCE_SYMBOL = "P8"
@@ -12,7 +12,7 @@ INSTANCE_TYPE = "RCO"
 TOPOLOGY_SIZE = 8
 APPROX_RATIO = 0.005
 HAMMING_CUTOFF = 100
-
+is_Z2 = True
 script_dir = os.path.dirname(os.path.abspath(__file__))
 cwd = os.getcwd()
 root = os.path.dirname(script_dir)
@@ -54,7 +54,7 @@ for filename in tqdm(os.listdir(dwave_directory)):
         instance_df = instance_df.sort_values(by='energy')
         ground_eng = min_values_df[min_values_df.index == name]['Energy'].values[0]
         filtered_states_eng = instance_df[instance_df['energy'] <= ground_eng + 2 * APPROX_RATIO * np.abs(ground_eng)]
-        steng, _ = get_state_energy_from_dwave(filtered_states_eng, 0, TOPOLOGY_SIZE, ground_eng)
+        steng, _ = get_state_energy_from_dwave(filtered_states_eng, 0, TOPOLOGY_SIZE, ground_eng, is_Z2)
 
         unique_states_df = pd.DataFrame(columns=instance_df.columns)
         steng_filtered = []

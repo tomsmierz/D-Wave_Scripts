@@ -22,11 +22,10 @@ from scipy.spatial.distance import hamming
 from typing import Optional, Union
 from tqdm import tqdm
 from itertools import zip_longest 
-from droplets_Z2 import (filter_states_by_energy, get_state_energy_from_dwave, 
-    read_json_files, read_h5_files, xor, hamming_dist, create_spin_glass_peps_graph, connected_hamming_dist,
-    filter_states_by_energy, find_droplets_hamming_connected, find_droplets_hamming, find_max_set_connected,
-    find_max_set, array_from_dict)
-
+from droplets import (xor, hamming_dist, create_spin_glass_peps_graph, connected_hamming_dist,
+    find_droplets_hamming_connected, find_droplets_hamming, find_max_set_connected,
+    find_max_set)
+from read_data import (read_all_json_files, read_all_csv_files, read_json_files, read_h5_files)
 # Instance characteristics
 BETA = 3.0
 
@@ -37,7 +36,7 @@ ENG= 20
 BD = 16
 MAX_STATES = 256
 INST = int(sys.argv[sys.argv.index("--inst") + 1])
-
+is_Z2 = False
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 cwd = os.getcwd()
@@ -54,7 +53,7 @@ output_directory_solver = os.path.join(root, "droplets", "square", "results","50
 vector = Union[np.ndarray, list]
 
 
-def find_droplets_in_union(results_folder, json_directory, cplex_directory, h5_directory, output_directory, best_found_path, instance_path, solver, **kwargs):
+def find_droplets_in_union(results_folder, json_directory, cplex_directory, h5_directory, output_directory, best_found_path, instance_path, solver, is_Z2: bool = False, **kwargs):
     if solver not in ["DWave", "SpinGlass", "SBM", "CPLEX", "PT", None]:
         raise ValueError("Solver should be \"DWave\", \"SpinGlass\", \"SBM\", \"CPLEX\", \"PT\" or None")
     min_df = pd.read_csv(best_found_path, index_col=0, delimiter=',', quotechar='"')
@@ -73,13 +72,13 @@ def find_droplets_in_union(results_folder, json_directory, cplex_directory, h5_d
         eng = kwargs["eng"]
         bd = kwargs["bd"]
         ms = kwargs["ms"]
-        result_names, counts = compute_droplets_in_union_spinglass(results_folder, json_directory, beta, eng, bd, ms, output_directory, instance_path, min_df, inst)
+        result_names, counts = compute_droplets_in_union_spinglass(results_folder, json_directory, beta, eng, bd, ms, output_directory, instance_path, min_df, inst, is_Z2)
 
     elif solver == "SBM":
-        result_names, counts = compute_droplets_in_union_sbm(results_folder, h5_directory, output_directory, instance_path, min_df, inst)
+        result_names, counts = compute_droplets_in_union_sbm(results_folder, h5_directory, output_directory, instance_path, min_df, inst, is_Z2)
 
     elif solver == "CPLEX":
-        result_names, counts = compute_droplets_in_union_cplex(results_folder, cplex_directory, output_directory, instance_path, min_df, inst)
+        result_names, counts = compute_droplets_in_union_cplex(results_folder, cplex_directory, output_directory, instance_path, min_df, inst, is_Z2)
 
     elif solver == "DWave":
         raise NotImplementedError()
@@ -134,13 +133,13 @@ def compute_union(results_folder, output_directory):
     return names, counts
 
 
-def compute_droplets_in_union_spinglass(results_folder, json_directory, beta, eng, bd, ms, output_directory, instance_path, min_df, inst):
+def compute_droplets_in_union_spinglass(results_folder, json_directory, beta, eng, bd, ms, output_directory, instance_path, min_df, inst, is_Z2: bool = False):
     names = []
     counts = []
     sts = []
     idx = []
     indices = []
-    spinglass_states = read_json_files(json_directory, beta, eng, bd, ms, min_df, APPROX_RATIO)
+    spinglass_states = read_json_files(json_directory, beta, eng, bd, ms, min_df, APPROX_RATIO, is_Z2)
     name_range = [f"{inst:03d}",] 
     output_csv_path = os.path.join(output_directory, f'tn_{beta}.csv')
 
@@ -185,7 +184,7 @@ def compute_droplets_in_union_spinglass(results_folder, json_directory, beta, en
     return names, counts
 
 
-def compute_droplets_in_union_cplex(results_folder, cplex_directory, output_directory, instance_path, min_df, inst):
+def compute_droplets_in_union_cplex(results_folder, cplex_directory, output_directory, instance_path, min_df, inst, is_Z2: bool = False):
     names = []
     counts = []
     sts = []
@@ -233,13 +232,13 @@ def compute_droplets_in_union_cplex(results_folder, cplex_directory, output_dire
     return names, counts
 
 
-def compute_droplets_in_union_sbm(results_folder, h5_directory, output_directory, instance_path, min_df, inst):
+def compute_droplets_in_union_sbm(results_folder, h5_directory, output_directory, instance_path, min_df, inst, is_Z2: bool = False):
     names = []
     counts = []
     sts = []
     idx = []
     indices = []
-    sbm_states  = read_h5_files(h5_directory, min_df, APPROX_RATIO, inst)
+    sbm_states  = read_h5_files(h5_directory, min_df, APPROX_RATIO, inst, is_Z2)
     name_range = [f"{inst:03d}",] 
     name = name_range[0]
     output_csv_path = os.path.join(output_directory, 'sbm.csv')
@@ -282,57 +281,7 @@ def compute_droplets_in_union_sbm(results_folder, h5_directory, output_directory
             
     return names, counts
 
-def read_all_json_files(directory, beta, df_min) -> dict:
-    instance_data = {}
-    for filename in os.listdir(directory):
-        file = os.path.join(directory, filename)
-        StateEnergy = namedtuple('StateEnergy', ['state', 'energy'])
-        if os.path.isfile(file) and file.endswith(".json"):
-            with open(file, encoding='utf-8') as f:
-                json_data = json.load(f)
-                if json_data['columns'][json_data['colindex']['lookup']['β']-1][0] == beta:
-                    instance_name = json_data['columns'][json_data['colindex']['lookup']['instance']-1][0].split('.')[0] #TODO
-                    energy_data = json_data['columns'][json_data['colindex']['lookup']['drop_eng']-1][0]
-                    state_data = json_data['columns'][json_data['colindex']['lookup']['ig_states']-1][0]
-                    state_data_np = array_from_dict(state_data)
-                    energy_data_np = np.array(energy_data)
-                    ground_eng = df_min[df_min.index == instance_name]['Energy'].values[0]
-                    cutoff_energy = APPROX_RATIO * 2 * np.abs(ground_eng)
-                    filtered_states, filtered_energies = filter_states_by_energy(state_data_np, energy_data_np, cutoff_energy, ground_eng)
-
-                    if instance_name in instance_data:
-                        existing_state_energy = instance_data[instance_name]
-                        new_state_data = np.concatenate((existing_state_energy.state, filtered_states))
-                        new_energy_data = np.concatenate((existing_state_energy.energy, filtered_energies))
-                        unique_rows, unique_indices = np.unique(new_state_data, axis=0, return_index=True)
-                        filtered_energy_data = new_energy_data[unique_indices]
-                        instance_data[instance_name] = StateEnergy(unique_rows, filtered_energy_data)                
-                    else:
-                       instance_data[instance_name] = StateEnergy(filtered_states, filtered_energies)
-                else:
-                    pass
-    return instance_data
-
-def read_all_csv_files(file_path, df_min) -> dict:
-    instance_data = {}
-    StateEnergy = namedtuple('StateEnergy', ['state', 'energy'])
-
-    if os.path.isfile(file_path) and file_path.endswith(".csv"):
-        with open(file_path, 'r', encoding='utf-8') as f:
-            reader = csv.reader(f, delimiter=';')
-            for row in reader:
-                instance_name = row[1].split('.')[0]
-                energy_value = float(row[2])
-                state_data = np.array([int(x) for x in row[3].split(',')])
-                    
-                if instance_name not in instance_data:
-                    instance_data[instance_name] = StateEnergy([], [])
-                    
-                instance_data[instance_name].state.append(state_data)
-                instance_data[instance_name].energy.append(energy_value)
-    return instance_data
-
-def create_independent_set_of_union_states(json_directory, cplex_directory, h5_directory, best_found_path, instance_path, history_directory, metric: Optional[str], **kwargs):
+def create_independent_set_of_union_states(json_directory, cplex_directory, h5_directory, best_found_path, instance_path, history_directory, metric: Optional[str], is_Z2: bool = False, **kwargs):
     min_df = pd.read_csv(best_found_path, index_col=0, delimiter=',', quotechar='"')
     min_df.index = min_df.index.map(lambda x: str(x).zfill(3))
     if not os.path.exists(history_directory):
@@ -341,11 +290,11 @@ def create_independent_set_of_union_states(json_directory, cplex_directory, h5_d
     
     beta = kwargs["beta"]
 
-    spinglass_states = read_all_json_files(json_directory, beta, min_df)
+    spinglass_states = read_all_json_files(json_directory, beta, APPROX_RATIO, min_df, is_Z2)
     cplex_states = read_all_csv_files(cplex_directory, min_df)
 
     inst = kwargs["inst"]
-    sbm_states = read_h5_files(h5_directory, min_df, APPROX_RATIO, inst)
+    sbm_states = read_h5_files(h5_directory, min_df, APPROX_RATIO, inst, is_Z2)
     for filename in tqdm(os.listdir(instance_path)):
         StateEnergy = namedtuple('StateEnergy', ['state', 'energy'])
 
@@ -384,9 +333,9 @@ def create_independent_set_of_union_states(json_directory, cplex_directory, h5_d
 
 if __name__ == '__main__':
     result = create_independent_set_of_union_states(json_directory, cplex_directory, h5_directory, minimum_path, instance_path, output_directory_union, 
-                                                    "connected", beta=BETA, inst=INST)
+                                                    "connected", is_Z2, beta=BETA, inst=INST)
     compute_union(output_directory_union, output_directory_solver)
-    name, count = find_droplets_in_union(output_directory_union, json_directory, cplex_directory, h5_directory, output_directory_solver, minimum_path, instance_path, "SpinGlass",
+    name, count = find_droplets_in_union(output_directory_union, json_directory, cplex_directory, h5_directory, output_directory_solver, minimum_path, instance_path, "SpinGlass", is_Z2,
                                     beta=BETA, eng=ENG, bd=BD, ms=MAX_STATES, inst=INST)
-    name_cplex, count_cplex = find_droplets_in_union(output_directory_union, json_directory, cplex_directory, h5_directory, output_directory_solver, minimum_path, instance_path, "CPLEX", inst=INST)
-    name_sbm, count_sbm = find_droplets_in_union(output_directory_union, json_directory, cplex_directory, h5_directory, output_directory_solver, minimum_path, instance_path, "SBM", inst=INST)
+    name_cplex, count_cplex = find_droplets_in_union(output_directory_union, json_directory, cplex_directory, h5_directory, output_directory_solver, minimum_path, instance_path, "CPLEX", is_Z2, inst=INST)
+    name_sbm, count_sbm = find_droplets_in_union(output_directory_union, json_directory, cplex_directory, h5_directory, output_directory_solver, minimum_path, instance_path, "SBM", is_Z2, inst=INST)

@@ -21,15 +21,17 @@ from scipy.spatial.distance import hamming
 from typing import Optional, Union
 from tqdm import tqdm
 from itertools import zip_longest 
-from droplets import (filter_states_by_energy, get_state_energy_from_dwave_zephyr, 
-    read_json_files, read_h5_files, xor, hamming_dist, create_spin_glass_peps_graph, connected_hamming_dist,
-    filter_states_by_energy, find_droplets_hamming_connected, find_droplets_hamming, find_max_set_connected,
-    find_max_set, array_from_dict)
+
+from droplets import (xor, hamming_dist, create_spin_glass_peps_graph, connected_hamming_dist,
+    find_droplets_hamming_connected, find_droplets_hamming, find_max_set_connected,
+    find_max_set)
+from read_data import (read_all_json_files, read_all_csv_files, read_json_files, read_h5_files, get_state_energy_from_dwave_zephyr)
 
 # Instance characteristics
 TOPOLOGY = "zephyr"
 INSTANCE_SYMBOL = "Z4"
 INSTANCE_TYPE = "RAU"
+is_Z2 = False
 TOPOLOGY_SIZE = 4
 BETA = 1
 HAMMING = 281 #147
@@ -60,7 +62,7 @@ output_directory_solver = os.path.join(root, "droplets", INSTANCE_SYMBOL, INSTAN
 
 vector = Union[np.ndarray, list]
 
-def find_droplets_in_union(results_folder, json_directory, dwave_directory, h5_directory, output_directory, best_found_path, instance_path, solver, **kwargs):
+def find_droplets_in_union(results_folder, json_directory, dwave_directory, h5_directory, output_directory, best_found_path, instance_path, solver, is_Z2: bool = False, **kwargs):
     if solver not in ["DWave", "SpinGlass", "SBM", "PT", None]:
         raise ValueError("Solver should be \"DWave\", \"SpinGlass\", \"SBM\", \"PT\" or None")
 
@@ -73,7 +75,7 @@ def find_droplets_in_union(results_folder, json_directory, dwave_directory, h5_d
         print(f"Folder '{output_directory}' created successfully.")
 
     if solver == "DWave":
-        result_names, counts = compute_droplets_in_union_dwave(results_folder, dwave_directory, min_df, instance_path, output_directory, inst)
+        result_names, counts = compute_droplets_in_union_dwave(results_folder, dwave_directory, min_df, instance_path, output_directory, inst, is_Z2)
 
     elif solver == "SpinGlass":
         if "beta" not in kwargs or "eng" not in kwargs or "bd" not in kwargs or "ms" not in kwargs:
@@ -84,10 +86,10 @@ def find_droplets_in_union(results_folder, json_directory, dwave_directory, h5_d
         bd = kwargs["bd"]
         ms = kwargs["ms"]
         text = kwargs["text"]
-        result_names, counts = compute_droplets_in_union_spinglass(results_folder, json_directory, beta, eng, bd, ms, output_directory, instance_path, min_df, inst, text)
+        result_names, counts = compute_droplets_in_union_spinglass(results_folder, json_directory, beta, eng, bd, ms, output_directory, instance_path, min_df, inst, text, is_Z2)
 
     elif solver == "SBM":
-        result_names, counts = compute_droplets_in_union_sbm(results_folder, h5_directory, output_directory, instance_path, min_df, inst)
+        result_names, counts = compute_droplets_in_union_sbm(results_folder, h5_directory, output_directory, instance_path, min_df, inst, is_Z2)
 
     elif solver == "PT":
         raise NotImplementedError()
@@ -139,7 +141,7 @@ def compute_union(results_folder, output_directory):
     return names, counts
 
 
-def compute_droplets_in_union_dwave(results_folder, dwave_directory, min_df, instance_path, output_directory, inst):
+def compute_droplets_in_union_dwave(results_folder, dwave_directory, min_df, instance_path, output_directory, inst, is_Z2: bool = False):
     names = []
     counts = []
     sts = []
@@ -162,7 +164,7 @@ def compute_droplets_in_union_dwave(results_folder, dwave_directory, min_df, ins
             instance_df = pd.read_csv(file, index_col=0, delimiter=',',quotechar='"')
             ground_eng = min_df[min_df.index == name]['Energy'].values[0]
             energy_cutoff = APPROX_RATIO * 2 * np.abs(ground_eng)
-            state_energy_tuple = get_state_energy_from_dwave_zephyr(instance_df, energy_cutoff, TOPOLOGY_SIZE, ground_eng)
+            state_energy_tuple = get_state_energy_from_dwave_zephyr(instance_df, energy_cutoff, TOPOLOGY_SIZE, ground_eng, is_Z2)
             dw_states = state_energy_tuple.state
                         
             count = 0
@@ -188,13 +190,13 @@ def compute_droplets_in_union_dwave(results_folder, dwave_directory, min_df, ins
             df_output.to_csv(output_csv_path, index=False, header=not os.path.exists(output_csv_path), mode='a')
     return names, counts
 
-def compute_droplets_in_union_spinglass(results_folder, json_directory, beta, eng, bd, ms, output_directory, instance_path, min_df, inst, text):
+def compute_droplets_in_union_spinglass(results_folder, json_directory, beta, eng, bd, ms, output_directory, instance_path, min_df, inst, text, is_Z2: bool = False):
     names = []
     counts = []
     sts = []
     idx = []
     indices = []
-    spinglass_states = read_json_files(json_directory, beta, eng, bd, ms, min_df, APPROX_RATIO)
+    spinglass_states = read_json_files(json_directory, beta, eng, bd, ms, min_df, APPROX_RATIO, is_Z2)
     name_range = [f"{inst:03d}",] 
     output_csv_path = os.path.join(output_directory, f'tn_{text}.csv')
     tn_output_path = os.path.join(output_directory, f'tn_states_{text}.txt')  # Ścieżka do pliku z tn_states
@@ -243,13 +245,13 @@ def compute_droplets_in_union_spinglass(results_folder, json_directory, beta, en
     return names, counts
 
 
-def compute_droplets_in_union_sbm(results_folder, h5_directory, output_directory, instance_path, min_df, inst):
+def compute_droplets_in_union_sbm(results_folder, h5_directory, output_directory, instance_path, min_df, inst, is_Z2: bool = False):
     names = []
     counts = []
     sts = []
     idx = []
     indices = []
-    sbm_states  = read_h5_files(h5_directory, min_df, APPROX_RATIO, inst)
+    sbm_states  = read_h5_files(h5_directory, min_df, APPROX_RATIO, inst, is_Z2)
     name_range = [f"{inst:03d}",] 
     name = name_range[0]
     output_csv_path = os.path.join(output_directory, 'sbm.csv')
@@ -292,40 +294,7 @@ def compute_droplets_in_union_sbm(results_folder, h5_directory, output_directory
             
     return names, counts
 
-
-def read_all_json_files(directory, beta, df_min) -> dict:
-    instance_data = {}
-    for filename in os.listdir(directory):
-        file = os.path.join(directory, filename)
-        StateEnergy = namedtuple('StateEnergy', ['state', 'energy'])
-        if os.path.isfile(file) and file.endswith(".json"):
-            with open(file, encoding='utf-8') as f:
-                json_data = json.load(f)
-                if json_data['columns'][json_data['colindex']['lookup']['β']-1][0] == beta:
-                    instance_name = json_data['columns'][json_data['colindex']['lookup']['instance']-1][0].split('_')[0]
-                    energy_data = json_data['columns'][json_data['colindex']['lookup']['drop_eng']-1][0]
-                    state_data = json_data['columns'][json_data['colindex']['lookup']['ig_states']-1][0]
-                    state_data_np = array_from_dict(state_data)
-                    energy_data_np = np.array(energy_data)
-                    ground_eng = df_min[df_min.index == instance_name]['Energy'].values[0]
-                    cutoff_energy = APPROX_RATIO * 2 * np.abs(ground_eng)
-                    filtered_states, filtered_energies = filter_states_by_energy(state_data_np, energy_data_np, cutoff_energy, ground_eng)
-
-                    if instance_name in instance_data:
-                        existing_state_energy = instance_data[instance_name]
-                        new_state_data = np.concatenate((existing_state_energy.state, filtered_states))
-                        new_energy_data = np.concatenate((existing_state_energy.energy, filtered_energies))
-                        unique_rows, unique_indices = np.unique(new_state_data, axis=0, return_index=True)
-                        filtered_energy_data = new_energy_data[unique_indices]
-                        instance_data[instance_name] = StateEnergy(unique_rows, filtered_energy_data)                
-                    else:
-                        instance_data[instance_name] = StateEnergy(filtered_states, filtered_energies)
-                else:
-                    pass
-    return instance_data
-
-
-def create_independent_set_of_union_states(dwave_directory, json_directory1, json_directory2, json_directory3, h5_directory, best_found_path, instance_path, history_directory, metric: Optional[str], **kwargs):
+def create_independent_set_of_union_states(dwave_directory, json_directory1, json_directory2, json_directory3, h5_directory, best_found_path, instance_path, history_directory, metric: Optional[str], is_Z2: bool = False, **kwargs):
 
     min_df = pd.read_csv(best_found_path, index_col=0)
     min_df.index = min_df.index.map(lambda x: str(x).zfill(3))
@@ -334,11 +303,11 @@ def create_independent_set_of_union_states(dwave_directory, json_directory1, jso
         print(f"Folder '{history_directory}' created successfully.")
     
     beta = kwargs["beta"]
-    spinglass_states1 = read_all_json_files(json_directory1, beta, min_df)
-    spinglass_states2 = read_all_json_files(json_directory2, beta, min_df)
-    spinglass_states3 = read_all_json_files(json_directory3, beta, min_df)
+    spinglass_states1 = read_all_json_files(json_directory1, beta, APPROX_RATIO, min_df, is_Z2)
+    spinglass_states2 = read_all_json_files(json_directory2, beta, APPROX_RATIO, min_df, is_Z2)
+    spinglass_states3 = read_all_json_files(json_directory3, beta, APPROX_RATIO, min_df, is_Z2)
     inst = kwargs["inst"]
-    sbm_states = read_h5_files(h5_directory, min_df, APPROX_RATIO, inst)
+    sbm_states = read_h5_files(h5_directory, min_df, APPROX_RATIO, inst, is_Z2)
     for filename in tqdm(os.listdir(dwave_directory)):
         StateEnergy = namedtuple('StateEnergy', ['state', 'energy'])
 
@@ -354,7 +323,7 @@ def create_independent_set_of_union_states(dwave_directory, json_directory1, jso
             instance_parameters = f"_beta{beta}_{metric}_best{ground_eng}"
             history_file_name = os.path.join(history_directory, f"{name}{instance_parameters}.csv")
             energy_cutoff = APPROX_RATIO * 2 * np.abs(ground_eng)
-            state_energy_dw = get_state_energy_from_dwave_zephyr(instance_df, energy_cutoff, TOPOLOGY_SIZE, ground_eng)
+            state_energy_dw = get_state_energy_from_dwave_zephyr(instance_df, energy_cutoff, TOPOLOGY_SIZE, ground_eng, is_Z2)
             state_energy_tn1 = spinglass_states1[name]
             state_energy_tn2 = spinglass_states2[name]
             state_energy_tn3 = spinglass_states3[name]
@@ -381,14 +350,14 @@ def create_independent_set_of_union_states(dwave_directory, json_directory1, jso
 
 if __name__ == '__main__':
     result = create_independent_set_of_union_states(dwave_directory, json_directory1, json_directory2, json_directory3, h5_directory, minimum_path, instance_path, output_directory_union, 
-                                                    "connected", beta=BETA, inst=INST)
+                                                    "connected", is_Z2, beta=BETA, inst=INST)
     compute_union(output_directory_union, output_directory_solver)
-    name, count = find_droplets_in_union(output_directory_union, json_directory1, dwave_directory, h5_directory, output_directory_solver, minimum_path, instance_path, "SpinGlass",
+    name, count = find_droplets_in_union(output_directory_union, json_directory1, dwave_directory, h5_directory, output_directory_solver, minimum_path, instance_path, "SpinGlass", is_Z2,
                                     beta=BETA, eng=ENG, bd=BD, ms=MAX_STATES, inst=INST, text="tr16")
-    name, count = find_droplets_in_union(output_directory_union, json_directory2, dwave_directory, h5_directory, output_directory_solver, minimum_path, instance_path, "SpinGlass",
+    name, count = find_droplets_in_union(output_directory_union, json_directory2, dwave_directory, h5_directory, output_directory_solver, minimum_path, instance_path, "SpinGlass", is_Z2,
                                     beta=BETA, eng=ENG, bd=BD, ms=MAX_STATES, inst=INST, text="tr20")
-    name, count = find_droplets_in_union(output_directory_union, json_directory3, dwave_directory, h5_directory, output_directory_solver, minimum_path, instance_path, "SpinGlass",
+    name, count = find_droplets_in_union(output_directory_union, json_directory3, dwave_directory, h5_directory, output_directory_solver, minimum_path, instance_path, "SpinGlass", is_Z2,
                                     beta=BETA, eng=ENG, bd=BD, ms=MAX_STATES, inst=INST, text="notr")
 
-    name_dw, count_dw = find_droplets_in_union(output_directory_union, json_directory1, dwave_directory, h5_directory, output_directory_solver, minimum_path, instance_path, "DWave", inst=INST)
-    name_sbm, count_sbm = find_droplets_in_union(output_directory_union, json_directory1, dwave_directory, h5_directory, output_directory_solver, minimum_path, instance_path, "SBM", inst=INST)
+    name_dw, count_dw = find_droplets_in_union(output_directory_union, json_directory1, dwave_directory, h5_directory, output_directory_solver, minimum_path, instance_path, "DWave", is_Z2, inst=INST)
+    name_sbm, count_sbm = find_droplets_in_union(output_directory_union, json_directory1, dwave_directory, h5_directory, output_directory_solver, minimum_path, instance_path, "SBM", is_Z2, inst=INST)
