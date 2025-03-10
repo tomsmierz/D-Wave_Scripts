@@ -1,3 +1,11 @@
+droplets/
+energies/
+instances/
+*.txt
+*.json
+*.csv
+*.png
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
